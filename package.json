@@ -20,7 +20,7 @@
     "types": "tsc -p tsconfig.json",
     "watch": "node build.mjs --watch",
     "ralph": "bash ralph/afk.sh",
-    "verify": "pnpm lint && pnpm types && pnpm tests"
+    "cheq": "pnpm lint && pnpm types && pnpm tests"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
