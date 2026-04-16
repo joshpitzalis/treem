@@ -624,7 +624,9 @@ function formatScore(score: number): string {
 }
 
 function formatPercentage(percentage: number): string {
-  return `${percentage.toFixed(0)}%`
+  return Number.isInteger(percentage)
+    ? `${percentage}%`
+    : `${percentage.toFixed(1)}%`
 }
 
 function toggleScoreInfo(): void {

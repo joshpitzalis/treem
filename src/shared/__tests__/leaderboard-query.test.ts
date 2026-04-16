@@ -118,6 +118,115 @@ describe("summarizeTreemap", () => {
     expect(last30Days.tiles[0]?.messageCount).toBe(3)
   })
 
+  it("omits zero-count named categories and recomputes mixed composition per time slice", () => {
+    const messages = [
+      createMessage("m-1", "2026-04-16T10:00:00.000Z"),
+      createMessage("m-2", "2026-04-16T09:00:00.000Z"),
+      createMessage("m-3", "2026-04-13T09:00:00.000Z"),
+      createMessage("m-4", "2026-03-25T09:00:00.000Z"),
+      createMessage("m-5", "2026-03-24T09:00:00.000Z")
+    ]
+    const categories = [
+      createCategory("cat-bug", "Bug"),
+      createCategory("cat-feature", "Feature"),
+      createCategory("cat-empty", "Empty")
+    ]
+    const messageCategoryAssignments = [
+      createAssignment("m-1", "cat-bug"),
+      createAssignment("m-2", "cat-bug"),
+      createAssignment("m-3", "cat-feature")
+    ]
+
+    const last24Hours = summarizeTreemap({
+      messages: filterMessagesByView({
+        messages,
+        guildId: "guild-1",
+        scopeMode: "server",
+        channelId: null,
+        timeRange: "24h",
+        now: NOW
+      }),
+      categories,
+      messageCategoryAssignments
+    })
+    const last7Days = summarizeTreemap({
+      messages: filterMessagesByView({
+        messages,
+        guildId: "guild-1",
+        scopeMode: "server",
+        channelId: null,
+        timeRange: "7d",
+        now: NOW
+      }),
+      categories,
+      messageCategoryAssignments
+    })
+    const last30Days = summarizeTreemap({
+      messages: filterMessagesByView({
+        messages,
+        guildId: "guild-1",
+        scopeMode: "server",
+        channelId: null,
+        timeRange: "30d",
+        now: NOW
+      }),
+      categories,
+      messageCategoryAssignments
+    })
+
+    expect(last24Hours).toEqual({
+      totalMessages: 2,
+      tiles: [
+        {
+          id: "cat-bug",
+          label: "Bug",
+          messageCount: 2,
+          percentage: 100
+        }
+      ]
+    })
+    expect(last7Days).toEqual({
+      totalMessages: 3,
+      tiles: [
+        {
+          id: "cat-bug",
+          label: "Bug",
+          messageCount: 2,
+          percentage: 66.7
+        },
+        {
+          id: "cat-feature",
+          label: "Feature",
+          messageCount: 1,
+          percentage: 33.3
+        }
+      ]
+    })
+    expect(last30Days).toEqual({
+      totalMessages: 5,
+      tiles: [
+        {
+          id: "cat-bug",
+          label: "Bug",
+          messageCount: 2,
+          percentage: 40
+        },
+        {
+          id: "uncategorized",
+          label: "Uncategorized",
+          messageCount: 2,
+          percentage: 40
+        },
+        {
+          id: "cat-feature",
+          label: "Feature",
+          messageCount: 1,
+          percentage: 20
+        }
+      ]
+    })
+  })
+
   it("returns empty treemap when slice has no messages", () => {
     expect(
       summarizeTreemap({
@@ -152,5 +261,24 @@ function createMessage(
     attachmentCount: 0,
     isReply: false,
     score: 1
+  }
+}
+
+function createCategory(id: string, name: string) {
+  return {
+    id,
+    guildId: "guild-1",
+    name,
+    normalizedName: name.toLowerCase(),
+    createdAt: "2026-04-16T07:00:00.000Z"
+  }
+}
+
+function createAssignment(messageId: string, categoryId: string) {
+  return {
+    messageId,
+    guildId: "guild-1",
+    categoryId,
+    assignedAt: "2026-04-16T10:30:00.000Z"
   }
 }

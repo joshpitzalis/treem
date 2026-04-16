@@ -161,7 +161,6 @@ export function summarizeTreemap(input: {
         percentage: roundPercentage((messageCount / totalMessages) * 100)
       }
     })
-    .sort((left, right) => right.messageCount - left.messageCount)
 
   if (uncategorizedCount > 0) {
     tiles.push({
@@ -171,6 +170,8 @@ export function summarizeTreemap(input: {
       percentage: roundPercentage((uncategorizedCount / totalMessages) * 100)
     })
   }
+
+  tiles.sort((left, right) => right.messageCount - left.messageCount)
 
   return {
     totalMessages,

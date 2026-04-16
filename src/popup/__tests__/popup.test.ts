@@ -98,6 +98,94 @@ describe("popup treemap baseline", () => {
     ).toMatch(/100%/)
     expect(savedPreferences.length).toBe(2)
   })
+
+  it("renders mixed named categories plus uncategorized and omits empty categories per time slice", async () => {
+    const dom = new JSDOM(
+      `
+        <main class="app-shell">
+          <section class="controls">
+            <button id="score-info-toggle" type="button"></button>
+            <select id="guild-select"></select>
+            <select id="channel-select"></select>
+            <div id="readiness-strip"></div>
+            <div id="score-info" hidden></div>
+            <p id="sync-status" hidden></p>
+            <p id="status"></p>
+          </section>
+          <section id="leaderboard"></section>
+          <section id="treemap"></section>
+        </main>
+      `,
+      {
+        url: "https://example.test"
+      }
+    )
+
+    const { window } = dom
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    const popupModule = await import("../popup")
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createMixedCompositionState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    expect(readTreemapTileLabels(window.document)).toEqual([
+      "Bug",
+      "Uncategorized",
+      "Feature"
+    ])
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").toMatch(
+      /Bug[\s\S]*2 messages[\s\S]*40% of slice/
+    )
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").toMatch(
+      /Uncategorized[\s\S]*2 messages[\s\S]*40% of slice/
+    )
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").not.toMatch(
+      /Empty/
+    )
+
+    const range7d = window.document.querySelector<HTMLButtonElement>(
+      '.time-tab[data-range="7d"]'
+    )
+    if (!range7d) {
+      throw new Error("Expected 7d time tab")
+    }
+    range7d.click()
+
+    expect(readTreemapTileLabels(window.document)).toEqual(["Bug", "Feature"])
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").toMatch(
+      /Bug[\s\S]*2 messages[\s\S]*66.7% of slice/
+    )
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").toMatch(
+      /Feature[\s\S]*1 messages[\s\S]*33.3% of slice/
+    )
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").not.toMatch(
+      /Uncategorized/
+    )
+
+    const range24h = window.document.querySelector<HTMLButtonElement>(
+      '.time-tab[data-range="24h"]'
+    )
+    if (!range24h) {
+      throw new Error("Expected 24h time tab")
+    }
+    range24h.click()
+
+    expect(readTreemapTileLabels(window.document)).toEqual(["Bug"])
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").toMatch(
+      /Bug[\s\S]*2 messages[\s\S]*100% of slice/
+    )
+    expect(window.document.querySelector("#treemap")?.textContent ?? "").not.toMatch(
+      /Feature|Uncategorized|Empty/
+    )
+  })
 })
 
 function createState(): LeaderboardState {
@@ -217,4 +305,114 @@ function createMessage(input: {
     isReply: false,
     score: 1
   }
+}
+
+function createMixedCompositionState(): LeaderboardState {
+  return {
+    messages: [
+      createMessage({
+        id: "mix-1",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-1",
+        channelName: "alpha",
+        authorKey: "alice",
+        authorName: "Alice",
+        messageTimestamp: "2026-04-16T10:00:00.000Z"
+      }),
+      createMessage({
+        id: "mix-2",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-1",
+        channelName: "alpha",
+        authorKey: "bob",
+        authorName: "Bob",
+        messageTimestamp: "2026-04-16T09:00:00.000Z"
+      }),
+      createMessage({
+        id: "mix-3",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-1",
+        channelName: "alpha",
+        authorKey: "cara",
+        authorName: "Cara",
+        messageTimestamp: "2026-04-13T10:00:00.000Z"
+      }),
+      createMessage({
+        id: "mix-4",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-2",
+        channelName: "beta",
+        authorKey: "drew",
+        authorName: "Drew",
+        messageTimestamp: "2026-03-25T10:00:00.000Z"
+      }),
+      createMessage({
+        id: "mix-5",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-2",
+        channelName: "beta",
+        authorKey: "eve",
+        authorName: "Eve",
+        messageTimestamp: "2026-03-24T10:00:00.000Z"
+      })
+    ],
+    viewerProfile: null,
+    scopeObservations: [],
+    popupPreferences: null,
+    categories: [
+      {
+        id: "cat-bug",
+        guildId: "guild-1",
+        name: "Bug",
+        normalizedName: "bug",
+        createdAt: "2026-04-16T07:00:00.000Z"
+      },
+      {
+        id: "cat-feature",
+        guildId: "guild-1",
+        name: "Feature",
+        normalizedName: "feature",
+        createdAt: "2026-04-16T07:05:00.000Z"
+      },
+      {
+        id: "cat-empty",
+        guildId: "guild-1",
+        name: "Empty",
+        normalizedName: "empty",
+        createdAt: "2026-04-16T07:10:00.000Z"
+      }
+    ],
+    messageCategoryAssignments: [
+      {
+        messageId: "mix-1",
+        guildId: "guild-1",
+        categoryId: "cat-bug",
+        assignedAt: "2026-04-16T10:05:00.000Z"
+      },
+      {
+        messageId: "mix-2",
+        guildId: "guild-1",
+        categoryId: "cat-bug",
+        assignedAt: "2026-04-16T09:05:00.000Z"
+      },
+      {
+        messageId: "mix-3",
+        guildId: "guild-1",
+        categoryId: "cat-feature",
+        assignedAt: "2026-04-13T10:05:00.000Z"
+      }
+    ],
+    updatedAt: "2026-04-16T12:00:00.000Z"
+  }
+}
+
+function readTreemapTileLabels(document: Document): string[] {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>(".treemap-tile-name")
+  ).map((node) => node.textContent ?? "")
 }
