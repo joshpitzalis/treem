@@ -1,8 +1,7 @@
-import assert from "node:assert/strict"
-import { describe, it } from "node:test"
+import { describe, expect, it } from "vitest"
 
-import { filterMessagesByView, summarizeTreemap } from "./leaderboard-query"
-import type { ContributionMessage } from "./types"
+import { filterMessagesByView, summarizeTreemap } from "../leaderboard-query"
+import type { ContributionMessage } from "../types"
 
 const NOW = Date.parse("2026-04-16T12:00:00.000Z")
 
@@ -45,7 +44,7 @@ describe("summarizeTreemap", () => {
       })
     })
 
-    assert.deepEqual(last24Hours, {
+    expect(last24Hours).toEqual({
       totalMessages: 1,
       tiles: [
         {
@@ -56,12 +55,12 @@ describe("summarizeTreemap", () => {
         }
       ]
     })
-    assert.equal(last7Days.tiles[0]?.messageCount, 2)
-    assert.equal(last30Days.tiles[0]?.messageCount, 3)
+    expect(last7Days.tiles[0]?.messageCount).toBe(2)
+    expect(last30Days.tiles[0]?.messageCount).toBe(3)
   })
 
   it("returns empty treemap when slice has no messages", () => {
-    assert.deepEqual(summarizeTreemap({ messages: [] }), {
+    expect(summarizeTreemap({ messages: [] })).toEqual({
       totalMessages: 0,
       tiles: []
     })

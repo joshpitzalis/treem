@@ -1,9 +1,7 @@
-import assert from "node:assert/strict"
-import { describe, it } from "node:test"
-
 import { JSDOM } from "jsdom"
+import { describe, expect, it } from "vitest"
 
-import type { LeaderboardState, PopupPreferences } from "../shared/types"
+import type { LeaderboardState, PopupPreferences } from "../../shared/types"
 
 describe("popup treemap baseline", () => {
   it("keeps leaderboard and treemap on same scope and time range", async () => {
@@ -36,7 +34,7 @@ describe("popup treemap baseline", () => {
       window
     })
 
-    const popupModule = await import("./popup")
+    const popupModule = await import("../popup")
     await popupModule.bootstrapPopup({
       document: window.document,
       loadState: async () => createState(),
@@ -46,62 +44,56 @@ describe("popup treemap baseline", () => {
       addStorageChangeListener: () => {}
     })
 
-    assert.match(
-      window.document.querySelector("#leaderboard")?.textContent ?? "",
-      /Guild One/
-    )
-    assert.match(
-      window.document.querySelector("#treemap")?.textContent ?? "",
-      /Guild One/
-    )
-    assert.match(
-      window.document.querySelector("#treemap")?.textContent ?? "",
-      /4 messages/
-    )
+    expect(
+      window.document.querySelector("#leaderboard")?.textContent ?? ""
+    ).toMatch(/Guild One/)
+    expect(
+      window.document.querySelector("#treemap")?.textContent ?? ""
+    ).toMatch(/Guild One/)
+    expect(
+      window.document.querySelector("#treemap")?.textContent ?? ""
+    ).toMatch(/4 messages/)
 
     const channelSelect =
       window.document.querySelector<HTMLSelectElement>("#channel-select")
-    assert.ok(channelSelect)
+    if (!channelSelect) {
+      throw new Error("Expected channel select")
+    }
 
     channelSelect.value = "channel-1"
     channelSelect.dispatchEvent(new window.Event("change"))
 
-    assert.match(
-      window.document.querySelector("#leaderboard")?.textContent ?? "",
-      /Guild One \/ #alpha/
-    )
-    assert.match(
-      window.document.querySelector("#treemap")?.textContent ?? "",
-      /Guild One \/ #alpha/
-    )
-    assert.match(
-      window.document.querySelector("#treemap")?.textContent ?? "",
-      /3 messages/
-    )
+    expect(
+      window.document.querySelector("#leaderboard")?.textContent ?? ""
+    ).toMatch(/Guild One \/ #alpha/)
+    expect(
+      window.document.querySelector("#treemap")?.textContent ?? ""
+    ).toMatch(/Guild One \/ #alpha/)
+    expect(
+      window.document.querySelector("#treemap")?.textContent ?? ""
+    ).toMatch(/3 messages/)
 
     const firstDayTab = window.document.querySelector<HTMLButtonElement>(
       '.time-tab[data-range="24h"]'
     )
-    assert.ok(firstDayTab)
+    if (!firstDayTab) {
+      throw new Error("Expected 24h time tab")
+    }
     firstDayTab.click()
 
-    assert.match(
-      window.document.querySelector("#leaderboard")?.textContent ?? "",
-      /Alice/
-    )
-    assert.doesNotMatch(
-      window.document.querySelector("#leaderboard")?.textContent ?? "",
-      /Bob/
-    )
-    assert.match(
-      window.document.querySelector("#treemap")?.textContent ?? "",
-      /1 messages/
-    )
-    assert.match(
-      window.document.querySelector("#treemap")?.textContent ?? "",
-      /100%/
-    )
-    assert.equal(savedPreferences.length, 2)
+    expect(
+      window.document.querySelector("#leaderboard")?.textContent ?? ""
+    ).toMatch(/Alice/)
+    expect(
+      window.document.querySelector("#leaderboard")?.textContent ?? ""
+    ).not.toMatch(/Bob/)
+    expect(
+      window.document.querySelector("#treemap")?.textContent ?? ""
+    ).toMatch(/1 messages/)
+    expect(
+      window.document.querySelector("#treemap")?.textContent ?? ""
+    ).toMatch(/100%/)
+    expect(savedPreferences.length).toBe(2)
   })
 })
 
