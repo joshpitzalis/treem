@@ -25,23 +25,13 @@ export function createCategoryAndAssign(input: {
   const now = input.now ?? new Date().toISOString()
   assertMessageInGuild(input.state, input.guildId, input.messageId)
   const normalizedName = normalizeCategoryName(categoryName)
-  const existingCategory = findCategoryByNormalizedName(
-    input.state,
-    input.guildId,
-    normalizedName
-  )
-  const category =
-    existingCategory ??
-    createCategory({
-      guildId: input.guildId,
-      name: categoryName,
-      normalizedName,
-      now
-    })
-
-  const categories = existingCategory
-    ? input.state.categories
-    : [...input.state.categories, category]
+  assertCategoryNameAvailable(input.state, input.guildId, normalizedName)
+  const category = createCategory({
+    guildId: input.guildId,
+    name: categoryName,
+    normalizedName,
+    now
+  })
   const assignment: MessageCategoryAssignment = {
     messageId: input.messageId,
     guildId: input.guildId,
@@ -56,7 +46,7 @@ export function createCategoryAndAssign(input: {
   return {
     state: {
       ...input.state,
-      categories,
+      categories: [...input.state.categories, category],
       messageCategoryAssignments: assignments,
       updatedAt: now
     },
@@ -197,7 +187,9 @@ function assertCategoryInGuild(
 ): void {
   if (categoryId === UNCATEGORIZED_CATEGORY_ID) return
 
-  const category = state.categories.find((candidate) => candidate.id === categoryId)
+  const category = state.categories.find(
+    (candidate) => candidate.id === categoryId
+  )
   if (!category || category.guildId !== guildId) {
     throw new Error("Category must exist in selected server before assignment")
   }
@@ -210,9 +202,18 @@ function findCategoryByNormalizedName(
 ): CategoryRecord | undefined {
   return state.categories.find(
     (category) =>
-      category.guildId === guildId &&
-      category.normalizedName === normalizedName
+      category.guildId === guildId && category.normalizedName === normalizedName
   )
+}
+
+function assertCategoryNameAvailable(
+  state: LeaderboardState,
+  guildId: string,
+  normalizedName: string
+): void {
+  if (!findCategoryByNormalizedName(state, guildId, normalizedName)) return
+
+  throw new Error("Category name already exists in selected server")
 }
 
 export { UNCATEGORIZED_CATEGORY_ID }

@@ -1,9 +1,9 @@
 import {
-  UNCATEGORIZED_CATEGORY_ID,
   assignMessageToCategory,
   clearMessageCategoryAssignment,
   createCategoryAndAssign,
-  listGuildCategories
+  listGuildCategories,
+  UNCATEGORIZED_CATEGORY_ID
 } from "../shared/category-state"
 import type { LeaderboardState } from "../shared/types"
 
@@ -115,6 +115,9 @@ function createControl(input: {
   inputNode.dataset.treemRole = "category-name-input"
   inputNode.className = "treem-category-name-input"
   inputNode.required = true
+  inputNode.addEventListener("input", () => {
+    inputNode.setCustomValidity("")
+  })
 
   const submit = input.document.createElement("button")
   submit.type = "submit"
@@ -161,23 +164,34 @@ function createControl(input: {
   form.addEventListener("submit", async (event) => {
     event.preventDefault()
 
-    const nextState = createCategoryAndAssign({
-      state: await input.loadState(),
-      guildId: input.guildId,
-      messageId: input.messageId,
-      categoryName: inputNode.value
-    }).state
+    try {
+      const nextState = createCategoryAndAssign({
+        state: await input.loadState(),
+        guildId: input.guildId,
+        messageId: input.messageId,
+        categoryName: inputNode.value
+      }).state
 
-    await input.saveState(nextState)
-    updateFormState({
-      state: nextState,
-      guildId: input.guildId,
-      messageId: input.messageId,
-      toggle,
-      categorySelect,
-      inputNode,
-      form
-    })
+      inputNode.setCustomValidity("")
+      await input.saveState(nextState)
+      updateFormState({
+        state: nextState,
+        guildId: input.guildId,
+        messageId: input.messageId,
+        toggle,
+        categorySelect,
+        inputNode,
+        form
+      })
+    } catch (error) {
+      if (error instanceof Error) {
+        inputNode.setCustomValidity(error.message)
+        inputNode.reportValidity()
+        return
+      }
+
+      throw error
+    }
   })
 
   return { root }

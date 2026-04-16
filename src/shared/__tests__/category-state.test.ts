@@ -35,43 +35,52 @@ describe("createCategoryAndAssign", () => {
     ])
   })
 
-  it("reuses same server category case-insensitively", () => {
-    const first = createCategoryAndAssign({
-      state: createState(),
-      guildId: "guild-1",
-      messageId: "guild-1:channel-1:message-1",
-      categoryName: "Bug",
-      now: "2026-04-16T12:00:00.000Z"
+  it("blocks duplicate category names case-insensitively within server", () => {
+    const state = createState({
+      categories: [createCategoryRecord("Bug")]
     })
 
-    const second = createCategoryAndAssign({
-      state: {
-        ...first.state,
-        messages: [
-          ...first.state.messages,
-          createMessage("guild-1:channel-1:message-2")
-        ]
-      },
-      guildId: "guild-1",
-      messageId: "guild-1:channel-1:message-2",
+    expect(() =>
+      createCategoryAndAssign({
+        state,
+        guildId: "guild-1",
+        messageId: "guild-1:channel-1:message-1",
+        categoryName: "bug",
+        now: "2026-04-16T12:05:00.000Z"
+      })
+    ).toThrowError("Category name already exists in selected server")
+  })
+
+  it("allows same normalized category name in different server", () => {
+    const state = createState({
+      messages: [
+        createMessage("guild-1:channel-1:message-1"),
+        createMessage("guild-2:channel-9:message-9", {
+          guildId: "guild-2",
+          guildName: "Guild Two",
+          channelId: "channel-9",
+          channelName: "omega"
+        })
+      ],
+      categories: [createCategoryRecord("Bug")]
+    })
+
+    const result = createCategoryAndAssign({
+      state,
+      guildId: "guild-2",
+      messageId: "guild-2:channel-9:message-9",
       categoryName: "bug",
       now: "2026-04-16T12:05:00.000Z"
     })
 
-    expect(second.state.categories).toHaveLength(1)
-    expect(second.category.id).toBe(first.category.id)
-    expect(second.state.messageCategoryAssignments).toEqual([
+    expect(result.state.categories).toEqual([
+      createCategoryRecord("Bug"),
       {
-        messageId: "guild-1:channel-1:message-1",
-        guildId: "guild-1",
-        categoryId: first.category.id,
-        assignedAt: "2026-04-16T12:00:00.000Z"
-      },
-      {
-        messageId: "guild-1:channel-1:message-2",
-        guildId: "guild-1",
-        categoryId: first.category.id,
-        assignedAt: "2026-04-16T12:05:00.000Z"
+        id: "cat:guild-2:bug",
+        guildId: "guild-2",
+        name: "bug",
+        normalizedName: "bug",
+        createdAt: "2026-04-16T12:05:00.000Z"
       }
     ])
   })
@@ -151,17 +160,30 @@ function createState(
   }
 }
 
-function createCategoryRecord(name: string) {
+function createCategoryRecord(
+  name: string,
+  overrides: Partial<{
+    id: string
+    guildId: string
+    name: string
+    normalizedName: string
+    createdAt: string
+  }> = {}
+) {
   return {
-    id: `cat:guild-1:${name.toLocaleLowerCase()}`,
+    id: `cat:${overrides.guildId ?? "guild-1"}:${name.toLocaleLowerCase()}`,
     guildId: "guild-1",
     name,
     normalizedName: name.toLocaleLowerCase(),
-    createdAt: "2026-04-16T11:00:00.000Z"
+    createdAt: "2026-04-16T11:00:00.000Z",
+    ...overrides
   }
 }
 
-function createMessage(id: string) {
+function createMessage(
+  id: string,
+  overrides: Partial<LeaderboardState["messages"][number]> = {}
+) {
   return {
     id,
     guildId: "guild-1",
@@ -177,6 +199,7 @@ function createMessage(id: string) {
     reactionCount: 0,
     attachmentCount: 0,
     isReply: false,
-    score: 1
+    score: 1,
+    ...overrides
   }
 }

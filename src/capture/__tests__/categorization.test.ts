@@ -223,6 +223,148 @@ describe("categorization controls", () => {
       }
     ])
   })
+
+  it("shows server category created in another channel", async () => {
+    const createdState = await createCategoryInChannel("channel-1", "Bug")
+
+    const dom = new JSDOM(
+      `
+        <body>
+          <ol data-list-id="chat-messages">
+            <li id="chat-messages-message-2">
+              <article>
+                <div class="header">
+                  <time datetime="2026-04-16T11:00:00.000Z"></time>
+                </div>
+              </article>
+            </li>
+          </ol>
+        </body>
+      `,
+      { url: "https://discord.com/channels/guild-1/channel-2" }
+    )
+    const { window } = dom
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    await enhanceCategorizationControls({
+      document: window.document,
+      guildId: "guild-1",
+      loadState: async () => ({
+        ...createdState,
+        messages: [
+          ...createdState.messages,
+          createMessage({
+            id: "guild-1:channel-2:message-2",
+            channelId: "channel-2",
+            channelName: "beta"
+          })
+        ]
+      }),
+      saveState: async () => {}
+    })
+
+    const toggle = window.document.querySelector<HTMLButtonElement>(
+      '[data-treem-role="category-toggle"]'
+    )
+    if (!toggle) throw new Error("Expected category toggle")
+    toggle.click()
+
+    const existingCategorySelect =
+      window.document.querySelector<HTMLSelectElement>(
+        '[data-treem-role="category-select"]'
+      )
+    if (!existingCategorySelect) throw new Error("Expected category select")
+
+    expect(
+      Array.from(existingCategorySelect.options).map((option) => option.text)
+    ).toEqual(["Choose category", "Bug", "Uncategorized"])
+  })
+
+  it("blocks duplicate category create and keeps existing categories for picker reuse", async () => {
+    const dom = new JSDOM(
+      `
+        <body>
+          <ol data-list-id="chat-messages">
+            <li id="chat-messages-message-1">
+              <article>
+                <div class="header">
+                  <time datetime="2026-04-16T10:00:00.000Z"></time>
+                </div>
+              </article>
+            </li>
+          </ol>
+        </body>
+      `,
+      { url: "https://discord.com/channels/guild-1/channel-1" }
+    )
+    const { window } = dom
+    const savedStates: LeaderboardState[] = []
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    await enhanceCategorizationControls({
+      document: window.document,
+      guildId: "guild-1",
+      loadState: async () =>
+        createState({
+          categories: [
+            {
+              id: "cat:guild-1:bug",
+              guildId: "guild-1",
+              name: "Bug",
+              normalizedName: "bug",
+              createdAt: "2026-04-16T08:00:00.000Z"
+            }
+          ]
+        }),
+      saveState: async (state) => {
+        savedStates.push(state)
+      }
+    })
+
+    const toggle = window.document.querySelector<HTMLButtonElement>(
+      '[data-treem-role="category-toggle"]'
+    )
+    if (!toggle) throw new Error("Expected category toggle")
+    toggle.click()
+
+    const input = window.document.querySelector<HTMLInputElement>(
+      '[data-treem-role="category-name-input"]'
+    )
+    if (!input) throw new Error("Expected category input")
+    input.value = "bug"
+
+    const form = window.document.querySelector<HTMLFormElement>(
+      '[data-treem-role="category-form"]'
+    )
+    if (!form) throw new Error("Expected category form")
+    form.dispatchEvent(
+      new window.Event("submit", { bubbles: true, cancelable: true })
+    )
+    await flushAsyncWork(window)
+
+    expect(savedStates).toHaveLength(0)
+    expect(input.validationMessage).toBe(
+      "Category name already exists in selected server"
+    )
+
+    const existingCategorySelect =
+      window.document.querySelector<HTMLSelectElement>(
+        '[data-treem-role="category-select"]'
+      )
+    if (!existingCategorySelect) throw new Error("Expected category select")
+
+    expect(
+      Array.from(existingCategorySelect.options).map((option) => option.text)
+    ).toEqual(["Choose category", "Bug", "Uncategorized"])
+  })
 })
 
 function createState(
@@ -267,4 +409,73 @@ async function flushAsyncWork(window: {
   setTimeout: (handler: TimerHandler, timeout?: number) => number
 }) {
   await new Promise((resolve) => window.setTimeout(resolve, 0))
+}
+
+async function createCategoryInChannel(
+  channelId: string,
+  categoryName: string
+): Promise<LeaderboardState> {
+  const dom = new JSDOM(
+    `
+      <body>
+        <ol data-list-id="chat-messages">
+          <li id="chat-messages-message-1">
+            <article>
+              <div class="header">
+                <time datetime="2026-04-16T10:00:00.000Z"></time>
+              </div>
+            </article>
+          </li>
+        </ol>
+      </body>
+    `,
+    { url: `https://discord.com/channels/guild-1/${channelId}` }
+  )
+  const { window } = dom
+  let state = createState({
+    messages: [
+      createMessage({
+        id: `guild-1:${channelId}:message-1`,
+        channelId,
+        channelName: channelId === "channel-1" ? "alpha" : "beta"
+      })
+    ]
+  })
+
+  Object.assign(globalThis, {
+    document: window.document,
+    window
+  })
+
+  await enhanceCategorizationControls({
+    document: window.document,
+    guildId: "guild-1",
+    loadState: async () => state,
+    saveState: async (nextState) => {
+      state = nextState
+    }
+  })
+
+  const toggle = window.document.querySelector<HTMLButtonElement>(
+    '[data-treem-role="category-toggle"]'
+  )
+  if (!toggle) throw new Error("Expected category toggle")
+  toggle.click()
+
+  const input = window.document.querySelector<HTMLInputElement>(
+    '[data-treem-role="category-name-input"]'
+  )
+  if (!input) throw new Error("Expected category input")
+  input.value = categoryName
+
+  const form = window.document.querySelector<HTMLFormElement>(
+    '[data-treem-role="category-form"]'
+  )
+  if (!form) throw new Error("Expected category form")
+  form.dispatchEvent(
+    new window.Event("submit", { bubbles: true, cancelable: true })
+  )
+  await flushAsyncWork(window)
+
+  return state
 }
