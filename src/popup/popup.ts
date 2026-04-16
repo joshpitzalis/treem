@@ -22,6 +22,7 @@ import type {
 
 const ALL_CHANNELS_VALUE = "__all__"
 const MIN_PROCESSING_MS = 600
+const TREEMAP_LAYOUT_SCALE = 100
 
 type PopupStorageChangeListener = (
   changes: Record<string, unknown>,
@@ -302,12 +303,18 @@ function renderTreemapSurface(summary: TreemapSummary): string {
     return `<div class="treemap-empty">No captured messages in this slice yet.</div>`
   }
 
+  const layout = createTreemapLayout(summary)
+
   return `
     <div class="treemap-chart" role="img" aria-label="Category composition treemap">
-      ${summary.tiles
-        .map((tile) => {
+      ${layout
+        .map(({ tile, rect }) => {
           return `
-            <article class="treemap-tile" data-tile-id="${escapeHtml(tile.id)}">
+            <article
+              class="treemap-tile"
+              data-tile-id="${escapeHtml(tile.id)}"
+              style="${buildTreemapTileStyle(rect)}"
+            >
               <p class="treemap-tile-name">${escapeHtml(tile.label)}</p>
               <p class="treemap-tile-count">${tile.messageCount} messages</p>
               <p class="treemap-tile-share">${formatPercentage(tile.percentage)} of slice</p>
@@ -317,6 +324,123 @@ function renderTreemapSurface(summary: TreemapSummary): string {
         .join("")}
     </div>
   `
+}
+
+interface TreemapRect {
+  top: number
+  left: number
+  width: number
+  height: number
+}
+
+function createTreemapLayout(summary: TreemapSummary): Array<{
+  tile: TreemapSummary["tiles"][number]
+  rect: TreemapRect
+}> {
+  return layoutTreemapTiles(
+    summary.tiles,
+    {
+      top: 0,
+      left: 0,
+      width: TREEMAP_LAYOUT_SCALE,
+      height: TREEMAP_LAYOUT_SCALE
+    },
+    "vertical"
+  )
+}
+
+function layoutTreemapTiles(
+  tiles: TreemapSummary["tiles"],
+  bounds: TreemapRect,
+  orientation: "horizontal" | "vertical"
+): Array<{ tile: TreemapSummary["tiles"][number]; rect: TreemapRect }> {
+  if (tiles.length === 0) return []
+
+  if (tiles.length === 1) {
+    return [{ tile: tiles[0], rect: bounds }]
+  }
+
+  const splitIndex = findBalancedSplitIndex(tiles)
+  const firstGroup = tiles.slice(0, splitIndex)
+  const secondGroup = tiles.slice(splitIndex)
+  const firstCount = sumTileCounts(firstGroup)
+  const totalCount = firstCount + sumTileCounts(secondGroup)
+  const firstRatio = totalCount === 0 ? 0 : firstCount / totalCount
+
+  if (orientation === "vertical") {
+    const firstWidth = bounds.width * firstRatio
+    return [
+      ...layoutTreemapTiles(
+        firstGroup,
+        {
+          ...bounds,
+          width: firstWidth
+        },
+        "horizontal"
+      ),
+      ...layoutTreemapTiles(
+        secondGroup,
+        {
+          ...bounds,
+          left: bounds.left + firstWidth,
+          width: bounds.width - firstWidth
+        },
+        "horizontal"
+      )
+    ]
+  }
+
+  const firstHeight = bounds.height * firstRatio
+  return [
+    ...layoutTreemapTiles(
+      firstGroup,
+      {
+        ...bounds,
+        height: firstHeight
+      },
+      "vertical"
+    ),
+    ...layoutTreemapTiles(
+      secondGroup,
+      {
+        ...bounds,
+        top: bounds.top + firstHeight,
+        height: bounds.height - firstHeight
+      },
+      "vertical"
+    )
+  ]
+}
+
+function findBalancedSplitIndex(tiles: TreemapSummary["tiles"]): number {
+  const totalCount = sumTileCounts(tiles)
+  let runningCount = 0
+
+  for (const [index, tile] of tiles.entries()) {
+    runningCount += tile.messageCount
+    if (runningCount >= totalCount / 2) {
+      return Math.min(index + 1, tiles.length - 1)
+    }
+  }
+
+  return 1
+}
+
+function sumTileCounts(tiles: TreemapSummary["tiles"]): number {
+  return tiles.reduce((sum, tile) => sum + tile.messageCount, 0)
+}
+
+function buildTreemapTileStyle(rect: TreemapRect): string {
+  return [
+    `left:${formatTreemapDimension(rect.left)}%`,
+    `top:${formatTreemapDimension(rect.top)}%`,
+    `width:${formatTreemapDimension(rect.width)}%`,
+    `height:${formatTreemapDimension(rect.height)}%`
+  ].join(";")
+}
+
+function formatTreemapDimension(value: number): string {
+  return value.toFixed(3)
 }
 
 function renderTopTen(

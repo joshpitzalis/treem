@@ -186,6 +186,56 @@ describe("popup treemap baseline", () => {
       /Feature|Uncategorized|Empty/
     )
   })
+
+  it("sizes treemap tiles by message count", async () => {
+    const dom = new JSDOM(
+      `
+        <main class="app-shell">
+          <section class="controls">
+            <button id="score-info-toggle" type="button"></button>
+            <select id="guild-select"></select>
+            <select id="channel-select"></select>
+            <div id="readiness-strip"></div>
+            <div id="score-info" hidden></div>
+            <p id="sync-status" hidden></p>
+            <p id="status"></p>
+          </section>
+          <section id="leaderboard"></section>
+          <section id="treemap"></section>
+        </main>
+      `,
+      {
+        url: "https://example.test"
+      }
+    )
+
+    const { window } = dom
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    const popupModule = await import("../popup")
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    expect(readTreemapTileArea(window.document, "cat-bug")).toBeCloseTo(5000, 0)
+    expect(readTreemapTileArea(window.document, "cat-feature")).toBeCloseTo(
+      2500,
+      0
+    )
+    expect(
+      readTreemapTileArea(window.document, "cat-bug")
+    ).toBeGreaterThan(readTreemapTileArea(window.document, "cat-feature"))
+    expect(
+      readTreemapTileArea(window.document, "cat-bug")
+    ).toBeGreaterThan(readTreemapTileArea(window.document, "uncategorized"))
+  })
 })
 
 function createState(): LeaderboardState {
@@ -415,4 +465,26 @@ function readTreemapTileLabels(document: Document): string[] {
   return Array.from(
     document.querySelectorAll<HTMLElement>(".treemap-tile-name")
   ).map((node) => node.textContent ?? "")
+}
+
+function readTreemapTileArea(document: Document, tileId: string): number {
+  const tile = document.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`)
+  if (!tile) {
+    throw new Error(`Expected treemap tile ${tileId}`)
+  }
+
+  const style = tile.getAttribute("style") ?? ""
+  const width = readStylePercentage(style, "width")
+  const height = readStylePercentage(style, "height")
+
+  return width * height
+}
+
+function readStylePercentage(style: string, property: string): number {
+  const match = style.match(new RegExp(`${property}:([0-9.]+)%`))
+  if (!match) {
+    throw new Error(`Expected ${property} in style: ${style}`)
+  }
+
+  return Number(match[1])
 }
