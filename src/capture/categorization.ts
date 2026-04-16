@@ -1,4 +1,10 @@
-import { createCategoryAndAssign } from "../shared/category-state"
+import {
+  UNCATEGORIZED_CATEGORY_ID,
+  assignMessageToCategory,
+  clearMessageCategoryAssignment,
+  createCategoryAndAssign,
+  listGuildCategories
+} from "../shared/category-state"
 import type { LeaderboardState } from "../shared/types"
 
 const MESSAGE_SELECTOR = [
@@ -97,6 +103,11 @@ function createControl(input: {
   form.className = "treem-category-form"
   form.hidden = true
 
+  const categorySelect = input.document.createElement("select")
+  categorySelect.name = "categoryId"
+  categorySelect.dataset.treemRole = "category-select"
+  categorySelect.className = "treem-category-select"
+
   const inputNode = input.document.createElement("input")
   inputNode.type = "text"
   inputNode.name = "categoryName"
@@ -109,12 +120,42 @@ function createControl(input: {
   submit.type = "submit"
   submit.textContent = "Save"
 
-  form.append(inputNode, submit)
+  populateCategoryOptions({
+    select: categorySelect,
+    categories: listGuildCategories(input.state, input.guildId)
+  })
+
+  form.append(categorySelect, inputNode, submit)
   root.append(toggle, form)
 
   toggle.addEventListener("click", () => {
     form.hidden = !form.hidden
-    if (!form.hidden) inputNode.focus()
+    if (!form.hidden) {
+      categorySelect.value = ""
+      inputNode.focus()
+    }
+  })
+
+  categorySelect.addEventListener("change", async () => {
+    if (!categorySelect.value) return
+
+    const nextState = await applyCategorySelection({
+      state: await input.loadState(),
+      guildId: input.guildId,
+      messageId: input.messageId,
+      categoryId: categorySelect.value
+    })
+
+    await input.saveState(nextState)
+    updateFormState({
+      state: nextState,
+      guildId: input.guildId,
+      messageId: input.messageId,
+      toggle,
+      categorySelect,
+      inputNode,
+      form
+    })
   })
 
   form.addEventListener("submit", async (event) => {
@@ -128,9 +169,15 @@ function createControl(input: {
     }).state
 
     await input.saveState(nextState)
-    toggle.textContent = currentCategoryLabel(nextState, input.messageId)
-    inputNode.value = ""
-    form.hidden = true
+    updateFormState({
+      state: nextState,
+      guildId: input.guildId,
+      messageId: input.messageId,
+      toggle,
+      categorySelect,
+      inputNode,
+      form
+    })
   })
 
   return { root }
@@ -215,6 +262,7 @@ function ensureCategorizationStyles(document: Document): void {
       gap: 6px;
       align-items: center;
     }
+    .treem-category-select,
     .treem-category-name-input {
       min-width: 120px;
       border-radius: 999px;
@@ -227,4 +275,67 @@ function ensureCategorizationStyles(document: Document): void {
   `
 
   document.head.append(style)
+}
+
+async function applyCategorySelection(input: {
+  state: LeaderboardState
+  guildId: string
+  messageId: string
+  categoryId: string
+}): Promise<LeaderboardState> {
+  if (input.categoryId === UNCATEGORIZED_CATEGORY_ID) {
+    return clearMessageCategoryAssignment({
+      state: input.state,
+      guildId: input.guildId,
+      messageId: input.messageId
+    }).state
+  }
+
+  return assignMessageToCategory({
+    state: input.state,
+    guildId: input.guildId,
+    messageId: input.messageId,
+    categoryId: input.categoryId
+  }).state
+}
+
+function populateCategoryOptions(input: {
+  select: HTMLSelectElement
+  categories: ReturnType<typeof listGuildCategories>
+}): void {
+  input.select.innerHTML = [
+    '<option value="">Choose category</option>',
+    ...input.categories.map(
+      (category) =>
+        `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`
+    ),
+    `<option value="${UNCATEGORIZED_CATEGORY_ID}">Uncategorized</option>`
+  ].join("")
+}
+
+function updateFormState(input: {
+  state: LeaderboardState
+  guildId: string
+  messageId: string
+  toggle: HTMLButtonElement
+  categorySelect: HTMLSelectElement
+  inputNode: HTMLInputElement
+  form: HTMLFormElement
+}): void {
+  input.toggle.textContent = currentCategoryLabel(input.state, input.messageId)
+  populateCategoryOptions({
+    select: input.categorySelect,
+    categories: listGuildCategories(input.state, input.guildId)
+  })
+  input.categorySelect.value = ""
+  input.inputNode.value = ""
+  input.form.hidden = true
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
 }

@@ -4,6 +4,8 @@ import type {
   MessageCategoryAssignment
 } from "./types"
 
+const UNCATEGORIZED_CATEGORY_ID = "__uncategorized__"
+
 export function createCategoryAndAssign(input: {
   state: LeaderboardState
   guildId: string
@@ -20,19 +22,13 @@ export function createCategoryAndAssign(input: {
     throw new Error("Category name required")
   }
 
-  const message = input.state.messages.find(
-    (candidate) => candidate.id === input.messageId
-  )
-  if (!message || message.guildId !== input.guildId) {
-    throw new Error("Message must exist in selected server before assignment")
-  }
-
   const now = input.now ?? new Date().toISOString()
+  assertMessageInGuild(input.state, input.guildId, input.messageId)
   const normalizedName = normalizeCategoryName(categoryName)
-  const existingCategory = input.state.categories.find(
-    (category) =>
-      category.guildId === input.guildId &&
-      category.normalizedName === normalizedName
+  const existingCategory = findCategoryByNormalizedName(
+    input.state,
+    input.guildId,
+    normalizedName
   )
   const category =
     existingCategory ??
@@ -65,8 +61,78 @@ export function createCategoryAndAssign(input: {
       updatedAt: now
     },
     category,
+    assignment: createAssignment({
+      guildId: input.guildId,
+      messageId: input.messageId,
+      categoryId: category.id,
+      assignedAt: now
+    })
+  }
+}
+
+export function assignMessageToCategory(input: {
+  state: LeaderboardState
+  guildId: string
+  messageId: string
+  categoryId: string
+  now?: string
+}): {
+  state: LeaderboardState
+  assignment: MessageCategoryAssignment
+} {
+  const now = input.now ?? new Date().toISOString()
+  assertMessageInGuild(input.state, input.guildId, input.messageId)
+  assertCategoryInGuild(input.state, input.guildId, input.categoryId)
+
+  const assignment = createAssignment({
+    guildId: input.guildId,
+    messageId: input.messageId,
+    categoryId: input.categoryId,
+    assignedAt: now
+  })
+
+  return {
+    state: {
+      ...input.state,
+      messageCategoryAssignments: upsertAssignment(
+        input.state.messageCategoryAssignments,
+        assignment
+      ),
+      updatedAt: now
+    },
     assignment
   }
+}
+
+export function clearMessageCategoryAssignment(input: {
+  state: LeaderboardState
+  guildId: string
+  messageId: string
+  now?: string
+}): {
+  state: LeaderboardState
+} {
+  const now = input.now ?? new Date().toISOString()
+  assertMessageInGuild(input.state, input.guildId, input.messageId)
+
+  return {
+    state: {
+      ...input.state,
+      messageCategoryAssignments: input.state.messageCategoryAssignments.filter(
+        (assignment) => assignment.messageId !== input.messageId
+      ),
+      updatedAt: now
+    }
+  }
+}
+
+export function listGuildCategories(
+  state: LeaderboardState,
+  guildId: string
+): CategoryRecord[] {
+  return state.categories
+    .filter((category) => category.guildId === guildId)
+    .sort((left, right) => left.name.localeCompare(right.name))
 }
 
 function createCategory(input: {
@@ -84,6 +150,20 @@ function createCategory(input: {
   }
 }
 
+function createAssignment(input: {
+  guildId: string
+  messageId: string
+  categoryId: string
+  assignedAt: string
+}): MessageCategoryAssignment {
+  return {
+    messageId: input.messageId,
+    guildId: input.guildId,
+    categoryId: input.categoryId,
+    assignedAt: input.assignedAt
+  }
+}
+
 function upsertAssignment(
   assignments: MessageCategoryAssignment[],
   nextAssignment: MessageCategoryAssignment
@@ -98,3 +178,41 @@ function upsertAssignment(
 function normalizeCategoryName(name: string): string {
   return name.trim().toLocaleLowerCase()
 }
+
+function assertMessageInGuild(
+  state: LeaderboardState,
+  guildId: string,
+  messageId: string
+): void {
+  const message = state.messages.find((candidate) => candidate.id === messageId)
+  if (!message || message.guildId !== guildId) {
+    throw new Error("Message must exist in selected server before assignment")
+  }
+}
+
+function assertCategoryInGuild(
+  state: LeaderboardState,
+  guildId: string,
+  categoryId: string
+): void {
+  if (categoryId === UNCATEGORIZED_CATEGORY_ID) return
+
+  const category = state.categories.find((candidate) => candidate.id === categoryId)
+  if (!category || category.guildId !== guildId) {
+    throw new Error("Category must exist in selected server before assignment")
+  }
+}
+
+function findCategoryByNormalizedName(
+  state: LeaderboardState,
+  guildId: string,
+  normalizedName: string
+): CategoryRecord | undefined {
+  return state.categories.find(
+    (category) =>
+      category.guildId === guildId &&
+      category.normalizedName === normalizedName
+  )
+}
+
+export { UNCATEGORIZED_CATEGORY_ID }

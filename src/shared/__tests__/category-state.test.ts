@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest"
 
-import { createCategoryAndAssign } from "../category-state"
+import {
+  assignMessageToCategory,
+  clearMessageCategoryAssignment,
+  createCategoryAndAssign
+} from "../category-state"
 import type { LeaderboardState } from "../types"
 
 describe("createCategoryAndAssign", () => {
@@ -71,9 +75,70 @@ describe("createCategoryAndAssign", () => {
       }
     ])
   })
+
+  it("reassigns message to existing server category without adding second assignment", () => {
+    const state = createState({
+      categories: [
+        createCategoryRecord("Bug"),
+        createCategoryRecord("Feature")
+      ],
+      messageCategoryAssignments: [
+        {
+          messageId: "guild-1:channel-1:message-1",
+          guildId: "guild-1",
+          categoryId: "cat:guild-1:bug",
+          assignedAt: "2026-04-16T12:00:00.000Z"
+        }
+      ]
+    })
+
+    const result = assignMessageToCategory({
+      state,
+      guildId: "guild-1",
+      messageId: "guild-1:channel-1:message-1",
+      categoryId: "cat:guild-1:feature",
+      now: "2026-04-16T12:05:00.000Z"
+    })
+
+    expect(result.state.messageCategoryAssignments).toEqual([
+      {
+        messageId: "guild-1:channel-1:message-1",
+        guildId: "guild-1",
+        categoryId: "cat:guild-1:feature",
+        assignedAt: "2026-04-16T12:05:00.000Z"
+      }
+    ])
+  })
+
+  it("clears message assignment back to uncategorized", () => {
+    const state = createState({
+      categories: [createCategoryRecord("Bug")],
+      messageCategoryAssignments: [
+        {
+          messageId: "guild-1:channel-1:message-1",
+          guildId: "guild-1",
+          categoryId: "cat:guild-1:bug",
+          assignedAt: "2026-04-16T12:00:00.000Z"
+        }
+      ]
+    })
+
+    const result = clearMessageCategoryAssignment({
+      state,
+      guildId: "guild-1",
+      messageId: "guild-1:channel-1:message-1",
+      now: "2026-04-16T12:05:00.000Z"
+    })
+
+    expect(result.state.categories).toEqual([createCategoryRecord("Bug")])
+    expect(result.state.messageCategoryAssignments).toEqual([])
+    expect(result.state.updatedAt).toBe("2026-04-16T12:05:00.000Z")
+  })
 })
 
-function createState(): LeaderboardState {
+function createState(
+  overrides: Partial<LeaderboardState> = {}
+): LeaderboardState {
   return {
     messages: [createMessage("guild-1:channel-1:message-1")],
     viewerProfile: null,
@@ -81,7 +146,18 @@ function createState(): LeaderboardState {
     popupPreferences: null,
     categories: [],
     messageCategoryAssignments: [],
-    updatedAt: null
+    updatedAt: null,
+    ...overrides
+  }
+}
+
+function createCategoryRecord(name: string) {
+  return {
+    id: `cat:guild-1:${name.toLocaleLowerCase()}`,
+    guildId: "guild-1",
+    name,
+    normalizedName: name.toLocaleLowerCase(),
+    createdAt: "2026-04-16T11:00:00.000Z"
   }
 }
 

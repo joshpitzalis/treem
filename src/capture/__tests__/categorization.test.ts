@@ -1,5 +1,6 @@
 import { JSDOM } from "jsdom"
 import { beforeEach, describe, expect, it } from "vitest"
+import { summarizeTreemap } from "../../shared/leaderboard-query"
 import type { LeaderboardState } from "../../shared/types"
 import { enhanceCategorizationControls } from "../categorization"
 
@@ -84,34 +85,186 @@ describe("categorization controls", () => {
       })
     ])
   })
+
+  it("reassigns message to existing category and clears back to uncategorized", async () => {
+    const dom = new JSDOM(
+      `
+        <body>
+          <ol data-list-id="chat-messages">
+            <li id="chat-messages-message-1">
+              <article>
+                <div class="header">
+                  <time datetime="2026-04-16T10:00:00.000Z"></time>
+                </div>
+              </article>
+            </li>
+          </ol>
+        </body>
+      `,
+      { url: "https://discord.com/channels/guild-1/channel-2" }
+    )
+    const { window } = dom
+    const savedStates: LeaderboardState[] = []
+    let state = createState({
+      messages: [
+        createMessage({
+          id: "guild-1:channel-2:message-1",
+          channelId: "channel-2",
+          channelName: "beta"
+        })
+      ],
+      categories: [
+        {
+          id: "cat:guild-1:bug",
+          guildId: "guild-1",
+          name: "Bug",
+          normalizedName: "bug",
+          createdAt: "2026-04-16T08:00:00.000Z"
+        },
+        {
+          id: "cat:guild-1:feature",
+          guildId: "guild-1",
+          name: "Feature",
+          normalizedName: "feature",
+          createdAt: "2026-04-16T08:05:00.000Z"
+        }
+      ],
+      messageCategoryAssignments: [
+        {
+          messageId: "guild-1:channel-2:message-1",
+          guildId: "guild-1",
+          categoryId: "cat:guild-1:bug",
+          assignedAt: "2026-04-16T10:05:00.000Z"
+        }
+      ]
+    })
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    await enhanceCategorizationControls({
+      document: window.document,
+      guildId: "guild-1",
+      loadState: async () => state,
+      saveState: async (nextState) => {
+        state = nextState
+        savedStates.push(nextState)
+      }
+    })
+
+    const toggle = window.document.querySelector<HTMLButtonElement>(
+      '[data-treem-role="category-toggle"]'
+    )
+    if (!toggle) throw new Error("Expected category toggle")
+    toggle.click()
+
+    const existingCategorySelect =
+      window.document.querySelector<HTMLSelectElement>(
+        '[data-treem-role="category-select"]'
+      )
+    if (!existingCategorySelect) throw new Error("Expected category select")
+
+    expect(existingCategorySelect.options).toHaveLength(4)
+    expect(
+      Array.from(existingCategorySelect.options).map((option) => option.text)
+    ).toEqual(["Choose category", "Bug", "Feature", "Uncategorized"])
+
+    existingCategorySelect.value = "cat:guild-1:feature"
+    existingCategorySelect.dispatchEvent(
+      new window.Event("change", { bubbles: true })
+    )
+    await flushAsyncWork(window)
+
+    expect(savedStates).toHaveLength(1)
+    expect(savedStates[0]?.messageCategoryAssignments).toEqual([
+      expect.objectContaining({
+        messageId: "guild-1:channel-2:message-1",
+        categoryId: "cat:guild-1:feature"
+      })
+    ])
+    expect(
+      summarizeTreemap({
+        messages: state.messages,
+        categories: state.categories,
+        messageCategoryAssignments: state.messageCategoryAssignments
+      }).tiles
+    ).toEqual([
+      {
+        id: "cat:guild-1:feature",
+        label: "Feature",
+        messageCount: 1,
+        percentage: 100
+      }
+    ])
+
+    toggle.click()
+    existingCategorySelect.value = "__uncategorized__"
+    existingCategorySelect.dispatchEvent(
+      new window.Event("change", { bubbles: true })
+    )
+    await flushAsyncWork(window)
+
+    expect(savedStates).toHaveLength(2)
+    expect(savedStates[1]?.messageCategoryAssignments).toEqual([])
+    expect(
+      summarizeTreemap({
+        messages: state.messages,
+        categories: state.categories,
+        messageCategoryAssignments: state.messageCategoryAssignments
+      }).tiles
+    ).toEqual([
+      {
+        id: "uncategorized",
+        label: "Uncategorized",
+        messageCount: 1,
+        percentage: 100
+      }
+    ])
+  })
 })
 
-function createState(): LeaderboardState {
+function createState(
+  overrides: Partial<LeaderboardState> = {}
+): LeaderboardState {
   return {
-    messages: [
-      {
-        id: "guild-1:channel-1:message-1",
-        guildId: "guild-1",
-        guildName: "Guild One",
-        channelId: "channel-1",
-        channelName: "alpha",
-        authorKey: "alice",
-        authorName: "Alice",
-        authorAvatarUrl: null,
-        messageTimestamp: "2026-04-16T10:00:00.000Z",
-        capturedAt: "2026-04-16T10:00:00.000Z",
-        contentLength: 5,
-        reactionCount: 0,
-        attachmentCount: 0,
-        isReply: false,
-        score: 1
-      }
-    ],
+    messages: [createMessage()],
     viewerProfile: null,
     scopeObservations: [],
     popupPreferences: null,
     categories: [],
     messageCategoryAssignments: [],
-    updatedAt: null
+    updatedAt: null,
+    ...overrides
   }
+}
+
+function createMessage(
+  overrides: Partial<LeaderboardState["messages"][number]> = {}
+) {
+  return {
+    id: "guild-1:channel-1:message-1",
+    guildId: "guild-1",
+    guildName: "Guild One",
+    channelId: "channel-1",
+    channelName: "alpha",
+    authorKey: "alice",
+    authorName: "Alice",
+    authorAvatarUrl: null,
+    messageTimestamp: "2026-04-16T10:00:00.000Z",
+    capturedAt: "2026-04-16T10:00:00.000Z",
+    contentLength: 5,
+    reactionCount: 0,
+    attachmentCount: 0,
+    isReply: false,
+    score: 1,
+    ...overrides
+  }
+}
+
+async function flushAsyncWork(window: {
+  setTimeout: (handler: TimerHandler, timeout?: number) => number
+}) {
+  await new Promise((resolve) => window.setTimeout(resolve, 0))
 }
