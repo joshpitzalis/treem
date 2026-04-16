@@ -1,0 +1,33 @@
+.DS_Store
+node_modules/
+
+# Generated extension bundles
+extension/capture/content.js
+extension/popup/popup.js
+
+# Packaged release artifacts
+release/*.zip
+
+# Common local secret files
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+!.env.example.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+.npmrc
+.credentials
+.secrets*
+
+# npm logs
+npm-debug.log*
+
+.claude/
+.husky/_/

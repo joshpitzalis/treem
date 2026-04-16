@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Discord Contribution Leaderboard</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="controls">
+        <div class="controls-header">
+          <div>
+            <p class="eyebrow">Discord</p>
+            <h1>Contributions Leaderboard</h1>
+          </div>
+          <button id="score-info-toggle" class="ghost-button" type="button" aria-expanded="false" aria-controls="score-info">
+            How points work
+          </button>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="guild-select">Server</label>
+          <select id="guild-select"></select>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="channel-select">Channel</label>
+          <select id="channel-select"></select>
+        </div>
+
+        <div id="readiness-strip" class="readiness-strip"></div>
+
+        <div id="score-info" class="score-info" hidden>
+          <p class="score-info-title">Contribution score per message</p>
+          <ul class="score-info-list">
+            <li>+1 base score for every message</li>
+            <li>+1 if the message looks like a reply</li>
+            <li>+1 if the message has attachments</li>
+            <li>+1 per visible reaction, capped at +3</li>
+            <li>+1 if the message is longer than 280 characters</li>
+            <li>-0.5 for messages shorter than 8 characters, with a minimum score of 1</li>
+          </ul>
+        </div>
+
+        <p id="sync-status" class="sync-status" hidden>Refreshing…</p>
+        <p id="status" class="status"></p>
+      </section>
+
+      <section id="leaderboard" class="leaderboard"></section>
+    </main>
+
+    <script src="popup/popup.js"></script>
+  </body>
+</html>

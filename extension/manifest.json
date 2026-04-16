@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Discord Contribution Leaderboard",
+  "version": "0.1.0",
+  "description": "Build a local leaderboard from Discord messages already rendered in your browser.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": ["storage"],
+  "host_permissions": ["https://discord.com/*"],
+  "action": {
+    "default_title": "Discord Contribution Leaderboard",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://discord.com/*"],
+      "js": ["capture/content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

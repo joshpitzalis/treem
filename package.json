@@ -1,0 +1,28 @@
+{
+  "name": "discord-contribution-leaderboard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Chrome extension that captures visible Discord activity and builds a local leaderboard.",
+  "scripts": {
+    "build": "npm run check && node build.mjs",
+    "biome:staged": "node scripts/run-biome-on-staged.mjs",
+    "check": "tsc -p tsconfig.json",
+    "format": "biome format --write .",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "prepare": "husky",
+    "precommit": "npm run biome:staged && npm run secrets:staged",
+    "prepush": "npm run secrets:repo",
+    "secrets:repo": "node scripts/check-secrets.mjs --repo",
+    "secrets:staged": "node scripts/check-secrets.mjs --staged",
+    "watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.12",
+    "@secretlint/secretlint-rule-preset-recommend": "^11.7.1",
+    "esbuild": "^0.28.0",
+    "husky": "^9.1.7",
+    "secretlint": "^11.7.1",
+    "typescript": "^6.0.2"
+  }
+}
