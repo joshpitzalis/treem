@@ -29,8 +29,8 @@ The MVP contribution score is intentionally simple:
 
 ## Load the extension
 
-1. Run `npm install`
-2. Run `npm run build`
+1. Run `pnpm install`
+2. Run `pnpm run build`
 3. Open `chrome://extensions`
 4. Enable Developer Mode
 5. Click `Load unpacked`
