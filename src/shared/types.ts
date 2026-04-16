@@ -54,6 +54,18 @@ export interface LeaderboardState {
   updatedAt: string | null
 }
 
+export interface TreemapTile {
+  id: string
+  label: string
+  messageCount: number
+  percentage: number
+}
+
+export interface TreemapSummary {
+  totalMessages: number
+  tiles: TreemapTile[]
+}
+
 export interface RankedContributor {
   rank: number
   authorKey: string

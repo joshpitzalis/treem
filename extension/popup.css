@@ -40,14 +40,16 @@ body {
 }
 
 .controls,
-.leaderboard {
+.leaderboard,
+.treemap {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 18px;
   box-shadow: var(--shadow);
 }
 
-.leaderboard {
+.leaderboard,
+.treemap {
   margin-top: 14px;
   padding: 10px;
 }
@@ -234,7 +236,8 @@ select {
 
 .leader-card,
 .empty-state,
-.gap-card {
+.gap-card,
+.treemap-frame {
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(72, 48, 33, 0.08);
   border-radius: 14px;
@@ -316,7 +319,11 @@ select {
 .leader-trailing,
 .you-divider,
 .empty-state,
-.gap-copy {
+.gap-copy,
+.treemap-subtitle,
+.treemap-empty,
+.treemap-tile-count,
+.treemap-tile-share {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
@@ -357,4 +364,79 @@ select {
 
 .gap-copy {
   margin: 6px 0 0;
+}
+
+.treemap-header {
+  padding: 4px 4px 10px;
+}
+
+.treemap-title {
+  margin: 0;
+  font-size: 18px;
+}
+
+.treemap-subtitle {
+  margin: 4px 0 0;
+}
+
+.treemap-frame {
+  display: grid;
+  aspect-ratio: 1 / 1;
+  min-height: 220px;
+  overflow: hidden;
+}
+
+.treemap-chart,
+.treemap-empty {
+  width: 100%;
+  height: 100%;
+}
+
+.treemap-chart {
+  display: grid;
+  padding: 10px;
+}
+
+.treemap-empty {
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.treemap-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: end;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  padding: 14px;
+  border-radius: 18px;
+  background:
+    linear-gradient(155deg, rgba(213, 111, 62, 0.96), rgba(169, 71, 29, 0.94)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  color: white;
+}
+
+.treemap-tile-name,
+.treemap-tile-count,
+.treemap-tile-share {
+  margin: 0;
+}
+
+.treemap-tile-name {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 0.95;
+}
+
+.treemap-tile-count {
+  color: rgba(255, 245, 239, 0.92);
+  font-weight: 700;
+}
+
+.treemap-tile-share {
+  color: rgba(255, 239, 231, 0.88);
 }

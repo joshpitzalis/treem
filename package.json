@@ -14,17 +14,23 @@
     "prepare": "husky",
     "precommit": "pnpm run biome:staged && pnpm run secrets:staged",
     "prepush": "pnpm run secrets:repo",
+    "tests": "tsx --test src/shared/leaderboard-query.test.ts src/popup/popup.test.ts",
     "secrets:repo": "node scripts/check-secrets.mjs --repo",
     "secrets:staged": "node scripts/check-secrets.mjs --staged",
+    "types": "tsc -p tsconfig.json",
     "watch": "node build.mjs --watch",
     "ralph": "bash ralph/afk.sh"
   },
   "devDependencies": {
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.7.2",
     "@biomejs/biome": "^2.4.12",
     "@secretlint/secretlint-rule-preset-recommend": "^11.7.1",
     "esbuild": "^0.28.0",
     "husky": "^9.1.7",
+    "jsdom": "^27.0.1",
     "secretlint": "^11.7.1",
+    "tsx": "^4.20.6",
     "typescript": "^6.0.2"
   }
 }

@@ -5,7 +5,8 @@ import {
   listGuilds,
   listReadinessStates,
   summarizeCoverage,
-  summarizeLeaderboard
+  summarizeLeaderboard,
+  summarizeTreemap
 } from "../shared/leaderboard-query"
 import { loadState, savePopupPreferences } from "../shared/storage"
 import type {
@@ -15,36 +16,62 @@ import type {
   LeaderboardState,
   LeaderboardSummary,
   RankedContributor,
-  TimeRangeKey
+  TimeRangeKey,
+  TreemapSummary
 } from "../shared/types"
 
 const ALL_CHANNELS_VALUE = "__all__"
 const MIN_PROCESSING_MS = 600
 
-const guildSelect = document.querySelector<HTMLSelectElement>("#guild-select")
-const channelSelect =
-  document.querySelector<HTMLSelectElement>("#channel-select")
-const readinessStrip = document.querySelector<HTMLElement>("#readiness-strip")
-const scoreInfoToggle =
-  document.querySelector<HTMLButtonElement>("#score-info-toggle")
-const scoreInfoPanel = document.querySelector<HTMLElement>("#score-info")
-const syncStatusNode = document.querySelector<HTMLElement>("#sync-status")
-const statusNode = document.querySelector<HTMLElement>("#status")
-const leaderboardNode = document.querySelector<HTMLElement>("#leaderboard")
+type PopupStorageChangeListener = (
+  changes: Record<string, unknown>,
+  areaName: string
+) => void
+
+interface PopupRuntime {
+  document: Document
+  loadState: typeof loadState
+  savePopupPreferences: typeof savePopupPreferences
+  addStorageChangeListener: (listener: PopupStorageChangeListener) => void
+}
+
+let popupRuntime: PopupRuntime = createBrowserRuntime()
+let guildSelect: HTMLSelectElement | null = null
+let channelSelect: HTMLSelectElement | null = null
+let readinessStrip: HTMLElement | null = null
+let scoreInfoToggle: HTMLButtonElement | null = null
+let scoreInfoPanel: HTMLElement | null = null
+let syncStatusNode: HTMLElement | null = null
+let statusNode: HTMLElement | null = null
+let leaderboardNode: HTMLElement | null = null
+let treemapNode: HTMLElement | null = null
 
 let currentState: LeaderboardState | null = null
 let selectedGuildId: string | null = null
 let selectedChannelId: string | null = null
 let selectedTimeRange: TimeRangeKey = "30d"
 let refreshInFlight = false
+let staticEventsBound = false
+let storageListenerBound = false
 
-async function bootstrapPopup(): Promise<void> {
+export async function bootstrapPopup(
+  runtimeOverrides: Partial<PopupRuntime> = {}
+): Promise<void> {
+  popupRuntime = {
+    ...createBrowserRuntime(),
+    ...runtimeOverrides
+  }
+  bindElements()
+  staticEventsBound = false
+  storageListenerBound = false
+
   if (
     !guildSelect ||
     !channelSelect ||
     !readinessStrip ||
     !statusNode ||
-    !leaderboardNode
+    !leaderboardNode ||
+    !treemapNode
   )
     return
 
@@ -78,8 +105,15 @@ async function bootstrapPopup(): Promise<void> {
 }
 
 function bindStaticEvents(): void {
-  guildSelect?.addEventListener("change", () => {
-    selectedGuildId = guildSelect.value
+  if (staticEventsBound) return
+  staticEventsBound = true
+
+  const boundGuildSelect = guildSelect
+  const boundChannelSelect = channelSelect
+  const boundScoreInfoToggle = scoreInfoToggle
+
+  boundGuildSelect?.addEventListener("change", () => {
+    selectedGuildId = boundGuildSelect.value
     const channels = listChannels(currentState?.messages ?? [], selectedGuildId)
     const preferredChannelId =
       currentState?.popupPreferences?.selectedChannelId ?? ALL_CHANNELS_VALUE
@@ -93,19 +127,22 @@ function bindStaticEvents(): void {
     render()
   })
 
-  channelSelect?.addEventListener("change", () => {
-    selectedChannelId = channelSelect.value
+  boundChannelSelect?.addEventListener("change", () => {
+    selectedChannelId = boundChannelSelect.value
     void persistPopupPreferences()
     render()
   })
 
-  scoreInfoToggle?.addEventListener("click", toggleScoreInfo)
+  boundScoreInfoToggle?.addEventListener("click", toggleScoreInfo)
 }
 
 function bindStorageListener(): void {
-  chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (storageListenerBound) return
+  storageListenerBound = true
+
+  popupRuntime.addStorageChangeListener((changes, areaName) => {
     if (areaName !== "local") return
-    if (!changes.discordLeaderboardState) return
+    if (!("discordLeaderboardState" in changes)) return
 
     void refreshState({
       showLoading: true,
@@ -122,7 +159,8 @@ function render(): void {
     !channelSelect ||
     !readinessStrip ||
     !statusNode ||
-    !leaderboardNode
+    !leaderboardNode ||
+    !treemapNode
   ) {
     return
   }
@@ -149,6 +187,9 @@ function render(): void {
     messages: filteredMessages,
     viewerProfile: currentState.viewerProfile
   })
+  const treemapSummary = summarizeTreemap({
+    messages: filteredMessages
+  })
 
   const readinessStates = listReadinessStates({
     messages: currentState.messages,
@@ -159,6 +200,7 @@ function render(): void {
 
   renderReadinessStates(readinessStates)
   renderLeaderboard(scopeLabel, leaderboardSummary)
+  renderTreemap(scopeLabel, treemapSummary)
   renderScrollTargetHint(selectedGuildId, scopedChannelId)
 }
 
@@ -237,6 +279,42 @@ function renderLeaderboard(
   `
 
   bindTimeTabEvents()
+}
+
+function renderTreemap(scopeLabel: string, summary: TreemapSummary): void {
+  if (!treemapNode) return
+
+  treemapNode.innerHTML = `
+    <div class="treemap-header">
+      <h2 class="treemap-title">Category Composition</h2>
+      <p class="treemap-subtitle">${escapeHtml(scopeLabel)}</p>
+    </div>
+    <div class="treemap-frame">
+      ${renderTreemapSurface(summary)}
+    </div>
+  `
+}
+
+function renderTreemapSurface(summary: TreemapSummary): string {
+  if (summary.totalMessages === 0) {
+    return `<div class="treemap-empty">No captured messages in this slice yet.</div>`
+  }
+
+  return `
+    <div class="treemap-chart" role="img" aria-label="Category composition treemap">
+      ${summary.tiles
+        .map((tile) => {
+          return `
+            <article class="treemap-tile" data-tile-id="${escapeHtml(tile.id)}">
+              <p class="treemap-tile-name">${escapeHtml(tile.label)}</p>
+              <p class="treemap-tile-count">${tile.messageCount} messages</p>
+              <p class="treemap-tile-share">${formatPercentage(tile.percentage)} of slice</p>
+            </article>
+          `
+        })
+        .join("")}
+    </div>
+  `
 }
 
 function renderTopTen(
@@ -320,7 +398,7 @@ function bindTimeTabEvents(): void {
 }
 
 function renderEmptyState(): void {
-  if (!statusNode || !readinessStrip || !leaderboardNode) return
+  if (!statusNode || !readinessStrip || !leaderboardNode || !treemapNode) return
 
   readinessStrip.innerHTML = `
     <span class="readiness-chip is-scroll">24h: Scroll more</span>
@@ -331,6 +409,15 @@ function renderEmptyState(): void {
   statusNode.textContent =
     "Open Discord in Chrome and browse a server to start collecting data."
   leaderboardNode.innerHTML = `<div class="empty-state">No contributors captured yet.</div>`
+  treemapNode.innerHTML = `
+    <div class="treemap-header">
+      <h2 class="treemap-title">Category Composition</h2>
+      <p class="treemap-subtitle">No server selected yet</p>
+    </div>
+    <div class="treemap-frame">
+      <div class="treemap-empty">Capture Discord messages to see category composition.</div>
+    </div>
+  `
 }
 
 function resolveChannelId(channels: ChannelOption[]): string {
@@ -348,7 +435,7 @@ function resolveChannelId(channels: ChannelOption[]): string {
 async function persistPopupPreferences(): Promise<void> {
   if (!selectedGuildId || !selectedChannelId) return
 
-  await savePopupPreferences({
+  await popupRuntime.savePopupPreferences({
     selectedGuildId,
     selectedChannelId,
     selectedTimeRange
@@ -438,7 +525,7 @@ async function refreshState(input: {
 
   const previousGuildId = selectedGuildId
   const previousChannelId = selectedChannelId
-  const nextState = await loadState()
+  const nextState = await popupRuntime.loadState()
 
   currentState = nextState
 
@@ -534,6 +621,10 @@ function formatScore(score: number): string {
   return Number.isInteger(score) ? String(score) : score.toFixed(1)
 }
 
+function formatPercentage(percentage: number): string {
+  return `${percentage.toFixed(0)}%`
+}
+
 function toggleScoreInfo(): void {
   if (!scoreInfoPanel || !scoreInfoToggle) return
 
@@ -549,6 +640,32 @@ function escapeHtml(input: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;")
+}
+
+function bindElements(): void {
+  const { document } = popupRuntime
+
+  guildSelect = document.querySelector<HTMLSelectElement>("#guild-select")
+  channelSelect = document.querySelector<HTMLSelectElement>("#channel-select")
+  readinessStrip = document.querySelector<HTMLElement>("#readiness-strip")
+  scoreInfoToggle =
+    document.querySelector<HTMLButtonElement>("#score-info-toggle")
+  scoreInfoPanel = document.querySelector<HTMLElement>("#score-info")
+  syncStatusNode = document.querySelector<HTMLElement>("#sync-status")
+  statusNode = document.querySelector<HTMLElement>("#status")
+  leaderboardNode = document.querySelector<HTMLElement>("#leaderboard")
+  treemapNode = document.querySelector<HTMLElement>("#treemap")
+}
+
+function createBrowserRuntime(): PopupRuntime {
+  return {
+    document,
+    loadState,
+    savePopupPreferences,
+    addStorageChangeListener: (listener) => {
+      chrome.storage.onChanged.addListener(listener)
+    }
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {

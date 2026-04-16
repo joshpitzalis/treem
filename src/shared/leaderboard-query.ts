@@ -9,6 +9,7 @@ import type {
   ScopeMode,
   ScopeObservation,
   TimeRangeKey,
+  TreemapSummary,
   ViewerProfile
 } from "./types"
 
@@ -99,6 +100,31 @@ export function summarizeLeaderboard(input: {
     gapToTopTen: calculateGapToTopTen(viewer, topTenScore, ranked.length),
     isTopTenOpen: ranked.length < 10,
     totalMessages: input.messages.length
+  }
+}
+
+export function summarizeTreemap(input: {
+  messages: ContributionMessage[]
+}): TreemapSummary {
+  const totalMessages = input.messages.length
+
+  if (totalMessages === 0) {
+    return {
+      totalMessages,
+      tiles: []
+    }
+  }
+
+  return {
+    totalMessages,
+    tiles: [
+      {
+        id: "uncategorized",
+        label: "Uncategorized",
+        messageCount: totalMessages,
+        percentage: 100
+      }
+    ]
   }
 }
 
