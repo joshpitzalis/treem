@@ -1,10 +1,12 @@
 import type {
+  CategoryRecord,
   ChannelOption,
   ContributionMessage,
   CoverageSummary,
   DataReadiness,
   GuildOption,
   LeaderboardSummary,
+  MessageCategoryAssignment,
   RankedContributor,
   ScopeMode,
   ScopeObservation,
@@ -105,6 +107,8 @@ export function summarizeLeaderboard(input: {
 
 export function summarizeTreemap(input: {
   messages: ContributionMessage[]
+  categories: CategoryRecord[]
+  messageCategoryAssignments: MessageCategoryAssignment[]
 }): TreemapSummary {
   const totalMessages = input.messages.length
 
@@ -115,16 +119,62 @@ export function summarizeTreemap(input: {
     }
   }
 
+  const categoriesById = new Map(
+    input.categories.map((category) => [category.id, category] as const)
+  )
+  const assignmentsByMessageId = new Map(
+    input.messageCategoryAssignments.map((assignment) => [
+      assignment.messageId,
+      assignment
+    ])
+  )
+  const categoryCounts = new Map<string, number>()
+  let uncategorizedCount = 0
+
+  for (const message of input.messages) {
+    const assignment = assignmentsByMessageId.get(message.id)
+    if (!assignment) {
+      uncategorizedCount += 1
+      continue
+    }
+
+    const category = categoriesById.get(assignment.categoryId)
+    if (!category) {
+      uncategorizedCount += 1
+      continue
+    }
+
+    categoryCounts.set(category.id, (categoryCounts.get(category.id) ?? 0) + 1)
+  }
+
+  const tiles = Array.from(categoryCounts.entries())
+    .map(([categoryId, messageCount]) => {
+      const category = categoriesById.get(categoryId)
+      if (!category) {
+        throw new Error(`Missing category for treemap tile: ${categoryId}`)
+      }
+
+      return {
+        id: category.id,
+        label: category.name,
+        messageCount,
+        percentage: roundPercentage((messageCount / totalMessages) * 100)
+      }
+    })
+    .sort((left, right) => right.messageCount - left.messageCount)
+
+  if (uncategorizedCount > 0) {
+    tiles.push({
+      id: "uncategorized",
+      label: "Uncategorized",
+      messageCount: uncategorizedCount,
+      percentage: roundPercentage((uncategorizedCount / totalMessages) * 100)
+    })
+  }
+
   return {
     totalMessages,
-    tiles: [
-      {
-        id: "uncategorized",
-        label: "Uncategorized",
-        messageCount: totalMessages,
-        percentage: 100
-      }
-    ]
+    tiles
   }
 }
 
@@ -445,6 +495,10 @@ function pickHumanName(currentName: string, nextName: string): string {
 }
 
 function roundScore(value: number): number {
+  return Math.round(value * 10) / 10
+}
+
+function roundPercentage(value: number): number {
   return Math.round(value * 10) / 10
 }
 

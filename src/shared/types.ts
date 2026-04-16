@@ -46,11 +46,28 @@ export interface PopupPreferences {
   selectedTimeRange: TimeRangeKey | null
 }
 
+export interface CategoryRecord {
+  id: string
+  guildId: string
+  name: string
+  normalizedName: string
+  createdAt: string
+}
+
+export interface MessageCategoryAssignment {
+  messageId: string
+  guildId: string
+  categoryId: string
+  assignedAt: string
+}
+
 export interface LeaderboardState {
   messages: ContributionMessage[]
   viewerProfile: ViewerProfile | null
   scopeObservations: ScopeObservation[]
   popupPreferences: PopupPreferences | null
+  categories: CategoryRecord[]
+  messageCategoryAssignments: MessageCategoryAssignment[]
   updatedAt: string | null
 }
 

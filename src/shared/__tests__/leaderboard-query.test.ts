@@ -6,6 +6,59 @@ import type { ContributionMessage } from "../types"
 const NOW = Date.parse("2026-04-16T12:00:00.000Z")
 
 describe("summarizeTreemap", () => {
+  it("returns named category plus uncategorized composition", () => {
+    const messages = [
+      createMessage("m-1", "2026-04-16T10:00:00.000Z"),
+      createMessage("m-2", "2026-04-16T09:00:00.000Z"),
+      createMessage("m-3", "2026-04-16T08:00:00.000Z")
+    ]
+
+    expect(
+      summarizeTreemap({
+        messages,
+        categories: [
+          {
+            id: "cat-bug",
+            guildId: "guild-1",
+            name: "Bug",
+            normalizedName: "bug",
+            createdAt: "2026-04-16T07:00:00.000Z"
+          }
+        ],
+        messageCategoryAssignments: [
+          {
+            messageId: "m-1",
+            guildId: "guild-1",
+            categoryId: "cat-bug",
+            assignedAt: "2026-04-16T10:30:00.000Z"
+          },
+          {
+            messageId: "m-2",
+            guildId: "guild-1",
+            categoryId: "cat-bug",
+            assignedAt: "2026-04-16T09:30:00.000Z"
+          }
+        ]
+      })
+    ).toEqual({
+      totalMessages: 3,
+      tiles: [
+        {
+          id: "cat-bug",
+          label: "Bug",
+          messageCount: 2,
+          percentage: 66.7
+        },
+        {
+          id: "uncategorized",
+          label: "Uncategorized",
+          messageCount: 1,
+          percentage: 33.3
+        }
+      ]
+    })
+  })
+
   it("returns uncategorized counts for each popup time slice", () => {
     const messages = [
       createMessage("m-24h", "2026-04-16T10:00:00.000Z"),
@@ -21,7 +74,9 @@ describe("summarizeTreemap", () => {
         channelId: null,
         timeRange: "24h",
         now: NOW
-      })
+      }),
+      categories: [],
+      messageCategoryAssignments: []
     })
     const last7Days = summarizeTreemap({
       messages: filterMessagesByView({
@@ -31,7 +86,9 @@ describe("summarizeTreemap", () => {
         channelId: null,
         timeRange: "7d",
         now: NOW
-      })
+      }),
+      categories: [],
+      messageCategoryAssignments: []
     })
     const last30Days = summarizeTreemap({
       messages: filterMessagesByView({
@@ -41,7 +98,9 @@ describe("summarizeTreemap", () => {
         channelId: null,
         timeRange: "30d",
         now: NOW
-      })
+      }),
+      categories: [],
+      messageCategoryAssignments: []
     })
 
     expect(last24Hours).toEqual({
@@ -60,7 +119,13 @@ describe("summarizeTreemap", () => {
   })
 
   it("returns empty treemap when slice has no messages", () => {
-    expect(summarizeTreemap({ messages: [] })).toEqual({
+    expect(
+      summarizeTreemap({
+        messages: [],
+        categories: [],
+        messageCategoryAssignments: []
+      })
+    ).toEqual({
       totalMessages: 0,
       tiles: []
     })

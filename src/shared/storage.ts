@@ -1,6 +1,8 @@
 import type {
+  CategoryRecord,
   ContributionMessage,
   LeaderboardState,
+  MessageCategoryAssignment,
   PopupPreferences,
   ScopeObservation,
   ViewerProfile
@@ -19,6 +21,8 @@ export async function loadState(): Promise<LeaderboardState> {
       viewerProfile: null,
       scopeObservations: [],
       popupPreferences: null,
+      categories: [],
+      messageCategoryAssignments: [],
       updatedAt: null
     }
   }
@@ -35,17 +39,33 @@ export async function loadState(): Promise<LeaderboardState> {
     popupPreferences: isPopupPreferences(state.popupPreferences)
       ? state.popupPreferences
       : null,
+    categories: Array.isArray(state.categories)
+      ? state.categories.filter(isCategoryRecord)
+      : [],
+    messageCategoryAssignments: Array.isArray(state.messageCategoryAssignments)
+      ? state.messageCategoryAssignments.filter(isMessageCategoryAssignment)
+      : [],
     updatedAt: typeof state.updatedAt === "string" ? state.updatedAt : null
   }
 }
 
 export async function saveState(nextState: LeaderboardState): Promise<void> {
+  const messages = pruneExpiredMessages(nextState.messages)
+  const categories = pruneCategories(nextState.categories)
+  const messageCategoryAssignments = pruneMessageCategoryAssignments({
+    assignments: nextState.messageCategoryAssignments,
+    messages,
+    categories
+  })
+
   await chrome.storage.local.set({
     [STORAGE_KEY]: {
-      messages: pruneExpiredMessages(nextState.messages),
+      messages,
       viewerProfile: nextState.viewerProfile,
       scopeObservations: pruneExpiredObservations(nextState.scopeObservations),
       popupPreferences: nextState.popupPreferences,
+      categories,
+      messageCategoryAssignments,
       updatedAt: nextState.updatedAt
     }
   })
@@ -59,6 +79,8 @@ export async function saveMessages(
     viewerProfile: (await loadState()).viewerProfile,
     scopeObservations: (await loadState()).scopeObservations,
     popupPreferences: (await loadState()).popupPreferences,
+    categories: (await loadState()).categories,
+    messageCategoryAssignments: (await loadState()).messageCategoryAssignments,
     updatedAt: new Date().toISOString()
   }
 
@@ -164,6 +186,32 @@ function getMessageRetentionCutoff(): number {
   return cutoff.getTime()
 }
 
+function pruneCategories(categories: CategoryRecord[]): CategoryRecord[] {
+  return categories.filter(isCategoryRecord)
+}
+
+function pruneMessageCategoryAssignments(input: {
+  assignments: MessageCategoryAssignment[]
+  messages: ContributionMessage[]
+  categories: CategoryRecord[]
+}): MessageCategoryAssignment[] {
+  const validMessageIds = new Set(input.messages.map((message) => message.id))
+  const validCategoryIds = new Set(
+    input.categories.map((category) => category.id)
+  )
+  const byMessage = new Map<string, MessageCategoryAssignment>()
+
+  for (const assignment of input.assignments) {
+    if (!isMessageCategoryAssignment(assignment)) continue
+    if (!validMessageIds.has(assignment.messageId)) continue
+    if (!validCategoryIds.has(assignment.categoryId)) continue
+
+    byMessage.set(assignment.messageId, assignment)
+  }
+
+  return Array.from(byMessage.values())
+}
+
 function isViewerProfile(value: unknown): value is ViewerProfile {
   if (!value || typeof value !== "object") return false
 
@@ -204,6 +252,33 @@ function isPopupPreferences(value: unknown): value is PopupPreferences {
     candidate.selectedTimeRange === "30d"
 
   return guildValid && channelValid && timeRangeValid
+}
+
+function isCategoryRecord(value: unknown): value is CategoryRecord {
+  if (!value || typeof value !== "object") return false
+
+  const candidate = value as Partial<CategoryRecord>
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.guildId === "string" &&
+    typeof candidate.name === "string" &&
+    typeof candidate.normalizedName === "string" &&
+    typeof candidate.createdAt === "string"
+  )
+}
+
+function isMessageCategoryAssignment(
+  value: unknown
+): value is MessageCategoryAssignment {
+  if (!value || typeof value !== "object") return false
+
+  const candidate = value as Partial<MessageCategoryAssignment>
+  return (
+    typeof candidate.messageId === "string" &&
+    typeof candidate.guildId === "string" &&
+    typeof candidate.categoryId === "string" &&
+    typeof candidate.assignedAt === "string"
+  )
 }
 
 function toScopeKey(guildId: string, channelId: string): string {

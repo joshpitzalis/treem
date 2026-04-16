@@ -52,7 +52,10 @@ describe("popup treemap baseline", () => {
     ).toMatch(/Guild One/)
     expect(
       window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/4 messages/)
+    ).toMatch(/Bug/)
+    expect(
+      window.document.querySelector("#treemap")?.textContent ?? ""
+    ).toMatch(/2 messages/)
 
     const channelSelect =
       window.document.querySelector<HTMLSelectElement>("#channel-select")
@@ -71,7 +74,7 @@ describe("popup treemap baseline", () => {
     ).toMatch(/Guild One \/ #alpha/)
     expect(
       window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/3 messages/)
+    ).toMatch(/Feature/)
 
     const firstDayTab = window.document.querySelector<HTMLButtonElement>(
       '.time-tab[data-range="24h"]'
@@ -89,7 +92,7 @@ describe("popup treemap baseline", () => {
     ).not.toMatch(/Bob/)
     expect(
       window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/1 messages/)
+    ).toMatch(/Bug/)
     expect(
       window.document.querySelector("#treemap")?.textContent ?? ""
     ).toMatch(/100%/)
@@ -154,6 +157,42 @@ function createState(): LeaderboardState {
     viewerProfile: null,
     scopeObservations: [],
     popupPreferences: null,
+    categories: [
+      {
+        id: "cat-bug",
+        guildId: "guild-1",
+        name: "Bug",
+        normalizedName: "bug",
+        createdAt: "2026-04-16T07:00:00.000Z"
+      },
+      {
+        id: "cat-feature",
+        guildId: "guild-1",
+        name: "Feature",
+        normalizedName: "feature",
+        createdAt: "2026-04-16T07:05:00.000Z"
+      }
+    ],
+    messageCategoryAssignments: [
+      {
+        messageId: "m-1",
+        guildId: "guild-1",
+        categoryId: "cat-bug",
+        assignedAt: "2026-04-16T10:05:00.000Z"
+      },
+      {
+        messageId: "m-2",
+        guildId: "guild-1",
+        categoryId: "cat-feature",
+        assignedAt: "2026-04-13T10:05:00.000Z"
+      },
+      {
+        messageId: "m-4",
+        guildId: "guild-1",
+        categoryId: "cat-bug",
+        assignedAt: "2026-04-16T08:05:00.000Z"
+      }
+    ],
     updatedAt: "2026-04-16T12:00:00.000Z"
   }
 }

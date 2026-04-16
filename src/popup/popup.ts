@@ -188,7 +188,9 @@ function render(): void {
     viewerProfile: currentState.viewerProfile
   })
   const treemapSummary = summarizeTreemap({
-    messages: filteredMessages
+    messages: filteredMessages,
+    categories: currentState.categories,
+    messageCategoryAssignments: currentState.messageCategoryAssignments
   })
 
   const readinessStates = listReadinessStates({
