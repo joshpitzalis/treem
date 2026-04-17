@@ -8,7 +8,6 @@
     "includes": [
       "src/**/*.ts",
       "scripts/**/*.mjs",
-      "build.mjs",
       "package.json",
       "tsconfig.json",
       "extension/manifest.json",

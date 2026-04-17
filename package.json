@@ -5,22 +5,22 @@
   "description": "Chrome extension that captures visible Discord activity and builds a local leaderboard.",
   "packageManager": "pnpm@10.2.0",
   "scripts": {
-    "build": "pnpm run check && node build.mjs",
+    "build": "tsc -p tsconfig.json && tsx src/build/cli.ts",
     "biome:staged": "node scripts/run-biome-on-staged.mjs",
     "check": "tsc -p tsconfig.json",
     "format": "biome format --write .",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "prepare": "husky",
-    "precommit": "pnpm run biome:staged && pnpm run secrets:staged",
-    "prepush": "pnpm run secrets:repo",
+    "precommit": "corepack pnpm run biome:staged && corepack pnpm run secrets:staged",
+    "prepush": "corepack pnpm run secrets:repo",
     "tests": "vitest run",
     "secrets:repo": "node scripts/check-secrets.mjs --repo",
     "secrets:staged": "node scripts/check-secrets.mjs --staged",
     "types": "tsc -p tsconfig.json",
-    "watch": "node build.mjs --watch",
+    "watch": "tsx src/build/cli.ts --watch",
     "ralph": "bash ralph/afk.sh",
-    "cheq": "pnpm lint && pnpm types && pnpm tests"
+    "cheq": "corepack pnpm lint && corepack pnpm types && corepack pnpm tests"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
@@ -33,6 +33,7 @@
     "secretlint": "^11.7.1",
     "tsx": "^4.20.6",
     "typescript": "^6.0.2",
+    "vite": "^8.0.8",
     "vitest": "^4.1.4"
   }
 }
