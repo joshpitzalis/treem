@@ -30,6 +30,13 @@ export async function enhanceCategorizationControls(
   runtime: CategorizationRuntime
 ): Promise<void> {
   const state = await runtime.loadState()
+  renderAllMessageControls(runtime, state)
+}
+
+function renderAllMessageControls(
+  runtime: CategorizationRuntime,
+  state: LeaderboardState
+): void {
   const capturedTopLevelMessageIds = new Set(
     state.messages
       .filter(
@@ -140,10 +147,7 @@ function renderMessageControl(input: {
         state={input.state}
         onStateChange={async (nextState) => {
           await input.runtime.saveState(nextState)
-          renderMessageControl({
-            ...input,
-            state: nextState
-          })
+          renderAllMessageControls(input.runtime, nextState)
         }}
       />
     )
@@ -170,8 +174,20 @@ function getOrCreateRoot(host: HTMLElement): Root {
         align-items: center;
         white-space: nowrap;
       }
+      .treem-category-picker,
+      .treem-category-create-form {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+      }
+      .treem-category-picker {
+        flex-wrap: wrap;
+      }
       .treem-category-toggle,
-      .treem-category-select {
+      .treem-category-select,
+      .treem-category-create-toggle,
+      .treem-category-create-input,
+      .treem-category-create-submit {
         min-width: 120px;
         border-radius: 999px;
         border: 1px solid rgba(255, 255, 255, 0.24);
@@ -186,6 +202,22 @@ function getOrCreateRoot(host: HTMLElement): Root {
       .treem-category-select {
         background: rgba(0, 0, 0, 0.2);
         padding: 2px 10px;
+      }
+      .treem-category-create-toggle,
+      .treem-category-create-submit {
+        background: rgba(88, 101, 242, 0.12);
+        padding: 2px 10px;
+        cursor: pointer;
+      }
+      .treem-category-create-input {
+        min-width: 140px;
+        background: rgba(0, 0, 0, 0.2);
+        padding: 2px 10px;
+      }
+      .treem-category-create-error {
+        margin: 0;
+        color: #ffb3ba;
+        font-size: 12px;
       }
     </style>
     <div data-treem-role="category-root"></div>
