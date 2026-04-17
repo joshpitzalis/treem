@@ -12,21 +12,27 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "prepare": "husky",
-    "precommit": "corepack pnpm run biome:staged && corepack pnpm run secrets:staged",
-    "prepush": "corepack pnpm run secrets:repo",
+    "precommit": "node scripts/run-pnpm.mjs run biome:staged && node scripts/run-pnpm.mjs run secrets:staged",
+    "prepush": "node scripts/run-pnpm.mjs run secrets:repo",
     "tests": "vitest run",
     "secrets:repo": "node scripts/check-secrets.mjs --repo",
     "secrets:staged": "node scripts/check-secrets.mjs --staged",
     "types": "tsc -p tsconfig.json",
     "watch": "tsx src/build/cli.ts --watch",
     "ralph": "bash ralph/afk.sh",
-    "cheq": "corepack pnpm lint && corepack pnpm types && corepack pnpm tests"
+    "cheq": "node scripts/run-pnpm.mjs lint && node scripts/run-pnpm.mjs types && node scripts/run-pnpm.mjs tests"
+  },
+  "dependencies": {
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
     "@secretlint/secretlint-rule-preset-recommend": "^11.7.1",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^24.7.2",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
     "esbuild": "^0.28.0",
     "husky": "^9.1.7",
     "jsdom": "^27.0.1",
