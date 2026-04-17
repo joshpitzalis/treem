@@ -17,12 +17,17 @@ import type {
   ChannelOption,
   DataReadiness,
   GuildOption,
-  LeaderboardState,
   LeaderboardSummary,
   RankedContributor,
   TimeRangeKey,
   TreemapSummary
 } from "../shared/types"
+
+import  {
+  leaderboardStateSchema
+} from "../shared/types"
+
+type LeaderboardState = typeof leaderboardStateSchema.Type
 
 const ALL_CHANNELS_VALUE = "__all__"
 const MIN_PROCESSING_MS = 600
@@ -54,6 +59,7 @@ let popupRuntime: PopupRuntime = createBrowserRuntime()
 let popupRoot: Root | null = null
 let popupMountNode: HTMLElement | null = null
 let renderKey = 0
+
 
 export async function bootstrapPopup(
   runtimeOverrides: Partial<PopupRuntime> = {}
@@ -372,7 +378,7 @@ function PopupApp(input: {
               void handleChannelChange(event.currentTarget.value)
             }}
           >
-            <option value={ALL_CHANNELS_VALUE}>All channelx</option>
+            <option value={ALL_CHANNELS_VALUE}>All channel</option>
             {channels.map((channel) => (
               <option key={channel.channelId} value={channel.channelId}>
                 {channel.channelName}

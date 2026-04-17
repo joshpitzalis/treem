@@ -1,53 +1,108 @@
+import { Option, Schema } from "effect"
 import type {
   CategoryRecord,
   ContributionMessage,
-  LeaderboardState,
   MessageCategoryAssignment,
   PopupPreferences,
   ScopeObservation,
   ViewerProfile
 } from "./types"
 
+import {
+  categoryRecordSchema,
+  contributionMessageSchema,
+  type leaderboardStateSchema,
+  messageCategoryAssignmentSchema,
+  popupPreferencesSchema,
+  scopeObservationSchema,
+  viewerProfileSchema
+} from "./types"
+
+type LeaderboardState = typeof leaderboardStateSchema.Type
+
 const STORAGE_KEY = "discordLeaderboardState"
 const THIRTY_DAYS_IN_MS = 30 * 24 * 60 * 60 * 1000
 
-export async function loadState(): Promise<LeaderboardState> {
+const emptyLeaderboardState: LeaderboardState = {
+  messages: [],
+  viewerProfile: null,
+  scopeObservations: [],
+  popupPreferences: null,
+  categories: [],
+  messageCategoryAssignments: [],
+  updatedAt: null
+}
+
+export async function loadState() {
   const raw = await chrome.storage.local.get(STORAGE_KEY)
   const stored = raw[STORAGE_KEY]
 
   if (!stored || typeof stored !== "object") {
-    return {
-      messages: [],
-      viewerProfile: null,
-      scopeObservations: [],
-      popupPreferences: null,
-      categories: [],
-      messageCategoryAssignments: [],
-      updatedAt: null
-    }
+    return emptyLeaderboardState
   }
 
-  const state = stored as Partial<LeaderboardState>
+  return decodeStoredLeaderboardState(stored)
+}
+
+//   decodeArrayItems(schema, input)      // bad items dropped
+function decodeArrayItems<S extends Schema.Decoder<unknown>>(
+  schema: S,
+  input: unknown
+): Array<S["Type"]> {
+  if (!Array.isArray(input)) return []
+
+  return input.flatMap((item) => {
+    const decoded = Schema.decodeUnknownOption(schema)(item)
+    return Option.isSome(decoded) ? [decoded.value] : []
+  })
+}
+
+//   decodeOptionalValue(schema, input)   // invalid -> null
+function decodeNullableValue<S extends Schema.Decoder<unknown>>(
+  schema: S,
+  input: unknown
+): S["Type"] | null {
+  if (input == null) return null
+
+  const decoded = Schema.decodeUnknownOption(schema)(input)
+  return Option.isSome(decoded) ? decoded.value : null
+}
+
+//   decodeNullableValue(schema, input)   // invalid -> null
+function decodeOptionalValue<S extends Schema.Decoder<unknown>>(
+  schema: S,
+  input: unknown
+): S["Type"] | null {
+  const decoded = Schema.decodeUnknownOption(schema)(input)
+  return Option.isSome(decoded) ? decoded.value : null
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function decodeStoredLeaderboardState(stored: unknown): LeaderboardState {
+  const candidate = isObject(stored) ? stored : {}
   return {
-    messages: Array.isArray(state.messages)
-      ? state.messages.filter(isContributionMessage)
-      : [],
-    viewerProfile: isViewerProfile(state.viewerProfile)
-      ? state.viewerProfile
-      : null,
-    scopeObservations: Array.isArray(state.scopeObservations)
-      ? state.scopeObservations.filter(isScopeObservation)
-      : [],
-    popupPreferences: isPopupPreferences(state.popupPreferences)
-      ? state.popupPreferences
-      : null,
-    categories: Array.isArray(state.categories)
-      ? state.categories.filter(isCategoryRecord)
-      : [],
-    messageCategoryAssignments: Array.isArray(state.messageCategoryAssignments)
-      ? state.messageCategoryAssignments.filter(isMessageCategoryAssignment)
-      : [],
-    updatedAt: typeof state.updatedAt === "string" ? state.updatedAt : null
+    messages: decodeArrayItems(contributionMessageSchema, candidate.messages),
+    viewerProfile: decodeOptionalValue(
+      viewerProfileSchema,
+      candidate.viewerProfile
+    ),
+    scopeObservations: decodeArrayItems(
+      scopeObservationSchema,
+      candidate.scopeObservations
+    ),
+    popupPreferences: decodeOptionalValue(
+      popupPreferencesSchema,
+      candidate.popupPreferences
+    ),
+    categories: decodeArrayItems(categoryRecordSchema, candidate.categories),
+    messageCategoryAssignments: decodeArrayItems(
+      messageCategoryAssignmentSchema,
+      candidate.messageCategoryAssignments
+    ),
+    updatedAt: decodeNullableValue(Schema.String, candidate.updatedAt)
   }
 }
 
@@ -174,31 +229,6 @@ function pruneExpiredMessages(
   })
 }
 
-function isContributionMessage(value: unknown): value is ContributionMessage {
-  if (!value || typeof value !== "object") return false
-
-  const candidate = value as Partial<ContributionMessage>
-
-  return (
-    typeof candidate.id === "string" &&
-    typeof candidate.guildId === "string" &&
-    typeof candidate.guildName === "string" &&
-    typeof candidate.channelId === "string" &&
-    typeof candidate.channelName === "string" &&
-    typeof candidate.authorKey === "string" &&
-    typeof candidate.authorName === "string" &&
-    (candidate.authorAvatarUrl === null ||
-      typeof candidate.authorAvatarUrl === "string") &&
-    typeof candidate.messageTimestamp === "string" &&
-    typeof candidate.capturedAt === "string" &&
-    typeof candidate.contentLength === "number" &&
-    typeof candidate.reactionCount === "number" &&
-    typeof candidate.attachmentCount === "number" &&
-    typeof candidate.isReply === "boolean" &&
-    typeof candidate.score === "number"
-  )
-}
-
 function pruneExpiredObservations(
   observations: ScopeObservation[]
 ): ScopeObservation[] {
@@ -252,48 +282,6 @@ function pruneUnusedCategories(
   )
 
   return categories.filter((category) => assignedCategoryIds.has(category.id))
-}
-
-function isViewerProfile(value: unknown): value is ViewerProfile {
-  if (!value || typeof value !== "object") return false
-
-  const candidate = value as Partial<ViewerProfile>
-  return (
-    typeof candidate.displayName === "string" &&
-    Array.isArray(candidate.authorKeys) &&
-    typeof candidate.capturedAt === "string"
-  )
-}
-
-function isScopeObservation(value: unknown): value is ScopeObservation {
-  if (!value || typeof value !== "object") return false
-
-  const candidate = value as Partial<ScopeObservation>
-  return (
-    typeof candidate.guildId === "string" &&
-    typeof candidate.channelId === "string" &&
-    typeof candidate.capturedAt === "string" &&
-    typeof candidate.sawLiveEdge === "boolean"
-  )
-}
-
-function isPopupPreferences(value: unknown): value is PopupPreferences {
-  if (!value || typeof value !== "object") return false
-
-  const candidate = value as Partial<PopupPreferences>
-  const guildValid =
-    candidate.selectedGuildId === null ||
-    typeof candidate.selectedGuildId === "string"
-  const channelValid =
-    candidate.selectedChannelId === null ||
-    typeof candidate.selectedChannelId === "string"
-  const timeRangeValid =
-    candidate.selectedTimeRange === null ||
-    candidate.selectedTimeRange === "24h" ||
-    candidate.selectedTimeRange === "7d" ||
-    candidate.selectedTimeRange === "30d"
-
-  return guildValid && channelValid && timeRangeValid
 }
 
 function isCategoryRecord(value: unknown): value is CategoryRecord {

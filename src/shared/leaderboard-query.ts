@@ -12,7 +12,8 @@ import type {
   ScopeObservation,
   TimeRangeKey,
   TreemapSummary,
-  ViewerProfile
+  ViewerProfile,
+  viewerProfileSchema
 } from "./types"
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000
@@ -88,7 +89,7 @@ export function listChannels(
 
 export function summarizeLeaderboard(input: {
   messages: ContributionMessage[]
-  viewerProfile: ViewerProfile | null
+  viewerProfile: typeof viewerProfileSchema.Type | null
 }): LeaderboardSummary {
   const ranked = rankContributors(input.messages)
   const viewer = findViewerRankedContributor(ranked, input.viewerProfile)
@@ -266,7 +267,7 @@ export function summarizeCoverage(input: {
   scopeMode: ScopeMode
   channelId: string | null
   timeRange: TimeRangeKey
-  now?: number
+  now?: number | undefined
 }): CoverageSummary {
   const now = input.now ?? Date.now()
   const targetMs = getTimeWindowDuration(input.timeRange)
