@@ -32,7 +32,12 @@ if (stagedFiles.length === 0) {
   process.exit(0)
 }
 
-runCommand(getBiomeCommand(), ["check", "--write", ...stagedFiles])
+runCommand(getBiomeCommand(), [
+  "check",
+  "--write",
+  "--no-errors-on-unmatched",
+  ...stagedFiles
+])
 runCommand("git", ["add", "--", ...stagedFiles])
 
 function getBiomeCommand() {
