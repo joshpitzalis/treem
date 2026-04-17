@@ -18,7 +18,7 @@ const buildTargets = [
     bundleName: "TreemCaptureBundle"
   },
   {
-    entryPath: "src/popup/popup.ts",
+    entryPath: "src/popup/popup.tsx",
     outputPath: "popup/popup.js",
     bundleName: "TreemPopupBundle"
   }
