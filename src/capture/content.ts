@@ -1,8 +1,11 @@
 import {
+  loadState,
   mergeMessages,
   saveScopeObservation,
+  saveState,
   saveViewerProfile
 } from "../shared/storage"
+import { enhanceCategorizationControls } from "./categorization"
 import {
   detectCurrentCommunity,
   detectLiveEdge,
@@ -42,9 +45,16 @@ async function captureVisibleMessages(): Promise<void> {
   })
 
   const messages = extractVisibleMessages(community)
-  if (messages.length === 0) return
+  if (messages.length > 0) {
+    await mergeMessages(messages)
+  }
 
-  await mergeMessages(messages)
+  await enhanceCategorizationControls({
+    document,
+    guildId: community.guildId,
+    loadState,
+    saveState
+  })
 }
 
 function startObserver(): void {

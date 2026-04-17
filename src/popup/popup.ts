@@ -22,6 +22,7 @@ import type {
 
 const ALL_CHANNELS_VALUE = "__all__"
 const MIN_PROCESSING_MS = 600
+const TREEMAP_LAYOUT_SCALE = 100
 
 type PopupStorageChangeListener = (
   changes: Record<string, unknown>,
@@ -51,6 +52,9 @@ let selectedGuildId: string | null = null
 let selectedChannelId: string | null = null
 let selectedTimeRange: TimeRangeKey = "30d"
 let refreshInFlight = false
+let syncStatusTimeoutId: number | null = null
+let queuedRefresh: { showLoading: boolean; preserveSelection: boolean } | null =
+  null
 let staticEventsBound = false
 let storageListenerBound = false
 
@@ -188,7 +192,9 @@ function render(): void {
     viewerProfile: currentState.viewerProfile
   })
   const treemapSummary = summarizeTreemap({
-    messages: filteredMessages
+    messages: filteredMessages,
+    categories: currentState.categories,
+    messageCategoryAssignments: currentState.messageCategoryAssignments
   })
 
   const readinessStates = listReadinessStates({
@@ -223,7 +229,7 @@ function renderChannelOptions(
 ): void {
   if (!channelSelect) return
 
-  const allOption = `<option value="${ALL_CHANNELS_VALUE}">All channels</option>`
+  const allOption = `<option value="${ALL_CHANNELS_VALUE}">All channelx</option>`
   const channelOptions = channels
     .map(
       (channel) =>
@@ -300,21 +306,213 @@ function renderTreemapSurface(summary: TreemapSummary): string {
     return `<div class="treemap-empty">No captured messages in this slice yet.</div>`
   }
 
+  const layout = createTreemapLayout(summary)
+
   return `
     <div class="treemap-chart" role="img" aria-label="Category composition treemap">
-      ${summary.tiles
-        .map((tile) => {
+      ${layout
+        .map(({ tile, rect }) => {
+          const density = describeTreemapTileDensity(rect)
+
           return `
-            <article class="treemap-tile" data-tile-id="${escapeHtml(tile.id)}">
-              <p class="treemap-tile-name">${escapeHtml(tile.label)}</p>
-              <p class="treemap-tile-count">${tile.messageCount} messages</p>
-              <p class="treemap-tile-share">${formatPercentage(tile.percentage)} of slice</p>
+            <article
+              class="treemap-tile is-${density}"
+              data-tile-id="${escapeHtml(tile.id)}"
+              style="${buildTreemapTileStyle(rect, tile.id)}"
+            >
+              ${renderTreemapTileCopy(tile, density)}
             </article>
           `
         })
         .join("")}
     </div>
   `
+}
+
+interface TreemapRect {
+  top: number
+  left: number
+  width: number
+  height: number
+}
+
+type TreemapTileDensity = "large" | "medium" | "small" | "tiny"
+
+function createTreemapLayout(summary: TreemapSummary): Array<{
+  tile: TreemapSummary["tiles"][number]
+  rect: TreemapRect
+}> {
+  return layoutTreemapTiles(
+    summary.tiles,
+    {
+      top: 0,
+      left: 0,
+      width: TREEMAP_LAYOUT_SCALE,
+      height: TREEMAP_LAYOUT_SCALE
+    },
+    "vertical"
+  )
+}
+
+function layoutTreemapTiles(
+  tiles: TreemapSummary["tiles"],
+  bounds: TreemapRect,
+  orientation: "horizontal" | "vertical"
+): Array<{ tile: TreemapSummary["tiles"][number]; rect: TreemapRect }> {
+  if (tiles.length === 0) return []
+
+  if (tiles.length === 1) {
+    return [{ tile: tiles[0], rect: bounds }]
+  }
+
+  const splitIndex = findBalancedSplitIndex(tiles)
+  const firstGroup = tiles.slice(0, splitIndex)
+  const secondGroup = tiles.slice(splitIndex)
+  const firstCount = sumTileCounts(firstGroup)
+  const totalCount = firstCount + sumTileCounts(secondGroup)
+  const firstRatio = totalCount === 0 ? 0 : firstCount / totalCount
+
+  if (orientation === "vertical") {
+    const firstWidth = bounds.width * firstRatio
+    return [
+      ...layoutTreemapTiles(
+        firstGroup,
+        {
+          ...bounds,
+          width: firstWidth
+        },
+        "horizontal"
+      ),
+      ...layoutTreemapTiles(
+        secondGroup,
+        {
+          ...bounds,
+          left: bounds.left + firstWidth,
+          width: bounds.width - firstWidth
+        },
+        "horizontal"
+      )
+    ]
+  }
+
+  const firstHeight = bounds.height * firstRatio
+  return [
+    ...layoutTreemapTiles(
+      firstGroup,
+      {
+        ...bounds,
+        height: firstHeight
+      },
+      "vertical"
+    ),
+    ...layoutTreemapTiles(
+      secondGroup,
+      {
+        ...bounds,
+        top: bounds.top + firstHeight,
+        height: bounds.height - firstHeight
+      },
+      "vertical"
+    )
+  ]
+}
+
+function findBalancedSplitIndex(tiles: TreemapSummary["tiles"]): number {
+  const totalCount = sumTileCounts(tiles)
+  let runningCount = 0
+
+  for (const [index, tile] of tiles.entries()) {
+    runningCount += tile.messageCount
+    if (runningCount >= totalCount / 2) {
+      return Math.min(index + 1, tiles.length - 1)
+    }
+  }
+
+  return 1
+}
+
+function sumTileCounts(tiles: TreemapSummary["tiles"]): number {
+  return tiles.reduce((sum, tile) => sum + tile.messageCount, 0)
+}
+
+function renderTreemapTileCopy(
+  tile: TreemapSummary["tiles"][number],
+  density: TreemapTileDensity
+): string {
+  const copy = [`<p class="treemap-tile-name">${escapeHtml(tile.label)}</p>`]
+
+  if (density !== "tiny") {
+    copy.push(`<p class="treemap-tile-count">${tile.messageCount} messages</p>`)
+  }
+
+  if (density === "large" || density === "medium" || tile.percentage >= 8) {
+    copy.push(
+      `<p class="treemap-tile-share">${formatPercentage(tile.percentage)} of slice</p>`
+    )
+  }
+
+  return copy.join("")
+}
+
+function describeTreemapTileDensity(rect: TreemapRect): TreemapTileDensity {
+  const area = rect.width * rect.height
+
+  if (area >= 2600) return "large"
+  if (area >= 1200) return "medium"
+  if (area >= 500) return "small"
+  return "tiny"
+}
+
+function buildTreemapTileStyle(rect: TreemapRect, tileId: string): string {
+  const palette = createTreemapTilePalette(tileId)
+
+  return [
+    `left:${formatTreemapDimension(rect.left)}%`,
+    `top:${formatTreemapDimension(rect.top)}%`,
+    `width:${formatTreemapDimension(rect.width)}%`,
+    `height:${formatTreemapDimension(rect.height)}%`,
+    `--treemap-fill-start:${palette.start}`,
+    `--treemap-fill-end:${palette.end}`,
+    `--treemap-fill-accent:${palette.accent}`
+  ].join(";")
+}
+
+function formatTreemapDimension(value: number): string {
+  return value.toFixed(3)
+}
+
+function createTreemapTilePalette(tileId: string): {
+  start: string
+  end: string
+  accent: string
+} {
+  const hash = hashText(tileId)
+  const hue = 18 + (hash % 18)
+  const saturation = 62 + (hash % 8)
+  const startLightness = 52 + (hash % 7)
+  const endLightness = 42 + (hash % 6)
+
+  return {
+    start: `hsl(${hue} ${saturation}% ${startLightness}%)`,
+    end: `hsl(${Math.max(10, hue - 4)} ${Math.min(
+      78,
+      saturation + 6
+    )}% ${endLightness}%)`,
+    accent: `hsla(${hue + 8} ${Math.max(46, saturation - 10)}% ${Math.min(
+      72,
+      startLightness + 10
+    )}% / 0.18)`
+  }
+}
+
+function hashText(value: string): number {
+  let hash = 0
+
+  for (const character of value) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0
+  }
+
+  return hash
 }
 
 function renderTopTen(
@@ -457,8 +655,8 @@ function renderScrollTargetHint(
   if (!currentState || !statusNode) return
 
   if (refreshInFlight) {
-    statusNode.hidden = false
-    statusNode.textContent = "Processing..."
+    statusNode.hidden = true
+    statusNode.textContent = ""
     return
   }
 
@@ -517,10 +715,45 @@ async function refreshState(input: {
   showLoading: boolean
   preserveSelection: boolean
 }): Promise<void> {
-  if (refreshInFlight) return
+  if (refreshInFlight) {
+    queuedRefresh = mergeRefreshRequests(queuedRefresh, input)
+    return
+  }
 
-  const refreshStartedAt = Date.now()
   refreshInFlight = true
+
+  try {
+    let pendingRefresh: typeof input | null = input
+
+    while (pendingRefresh) {
+      const activeRefresh = pendingRefresh
+      queuedRefresh = null
+      await runRefresh(activeRefresh)
+      pendingRefresh = queuedRefresh
+    }
+  } finally {
+    refreshInFlight = false
+    queuedRefresh = null
+  }
+}
+
+function mergeRefreshRequests(
+  current: { showLoading: boolean; preserveSelection: boolean } | null,
+  next: { showLoading: boolean; preserveSelection: boolean }
+): { showLoading: boolean; preserveSelection: boolean } {
+  if (!current) return next
+
+  return {
+    showLoading: current.showLoading || next.showLoading,
+    preserveSelection: current.preserveSelection || next.preserveSelection
+  }
+}
+
+async function runRefresh(input: {
+  showLoading: boolean
+  preserveSelection: boolean
+}): Promise<void> {
+  const refreshStartedAt = Date.now()
   setSyncStatus(input.showLoading)
 
   const previousGuildId = selectedGuildId
@@ -530,14 +763,12 @@ async function refreshState(input: {
   currentState = nextState
 
   if (!input.preserveSelection) {
-    refreshInFlight = false
     setSyncStatus(false)
     return
   }
 
   const guilds = listGuilds(nextState.messages)
   if (guilds.length === 0) {
-    refreshInFlight = false
     setSyncStatus(false)
     renderEmptyState()
     return
@@ -552,7 +783,6 @@ async function refreshState(input: {
       : guilds[0].guildId
 
   if (!selectedGuildId) {
-    refreshInFlight = false
     setSyncStatus(false)
     return
   }
@@ -573,21 +803,49 @@ async function refreshState(input: {
     await waitForMinimumProcessingWindow(refreshStartedAt)
   }
 
-  refreshInFlight = false
-  setSyncStatus(false)
+  if (input.showLoading) {
+    flashSyncStatus("Updated")
+  } else {
+    setSyncStatus(false)
+  }
   render()
 }
 
 function setSyncStatus(isVisible: boolean): void {
+  if (syncStatusTimeoutId != null) {
+    window.clearTimeout(syncStatusTimeoutId)
+    syncStatusTimeoutId = null
+  }
+
   if (syncStatusNode) {
-    syncStatusNode.hidden = true
+    syncStatusNode.hidden = !isVisible
+    syncStatusNode.textContent = isVisible ? "Updating..." : ""
   }
 
   if (!statusNode) return
   if (!isVisible) return
 
-  statusNode.hidden = false
-  statusNode.textContent = "Processing..."
+  statusNode.hidden = true
+  statusNode.textContent = ""
+}
+
+function flashSyncStatus(message: string): void {
+  if (syncStatusTimeoutId != null) {
+    window.clearTimeout(syncStatusTimeoutId)
+  }
+
+  if (syncStatusNode) {
+    syncStatusNode.hidden = false
+    syncStatusNode.textContent = message
+  }
+
+  syncStatusTimeoutId = window.setTimeout(() => {
+    if (syncStatusNode) {
+      syncStatusNode.hidden = true
+      syncStatusNode.textContent = ""
+    }
+    syncStatusTimeoutId = null
+  }, 1200)
 }
 
 async function waitForMinimumProcessingWindow(
@@ -622,7 +880,9 @@ function formatScore(score: number): string {
 }
 
 function formatPercentage(percentage: number): string {
-  return `${percentage.toFixed(0)}%`
+  return Number.isInteger(percentage)
+    ? `${percentage}%`
+    : `${percentage.toFixed(1)}%`
 }
 
 function toggleScoreInfo(): void {

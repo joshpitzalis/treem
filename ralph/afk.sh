@@ -30,11 +30,19 @@ ensure_pnpm_dependencies() {
   echo "node_modules not found. Installing dependencies with pnpm..."
 
   if [[ -f pnpm-lock.yaml ]]; then
-    pnpm install --frozen-lockfile
+    if ! pnpm install --frozen-lockfile; then
+      echo "pnpm install failed, so Ralph could not create node_modules." >&2
+      echo "If you launched this via 'pnpm ralph', pnpm may still print a trailing missing-node_modules warning because the bootstrap never completed." >&2
+      exit 1
+    fi
     return
   fi
 
-  pnpm install
+  if ! pnpm install; then
+    echo "pnpm install failed, so Ralph could not create node_modules." >&2
+    echo "If you launched this via 'pnpm ralph', pnpm may still print a trailing missing-node_modules warning because the bootstrap never completed." >&2
+    exit 1
+  fi
 }
 
 ensure_pnpm_dependencies

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Never Nest"
+  short_description: "Flatten nested code"
+  default_prompt: "Use $never-nest to refactor this code so no function exceeds 3 levels of indentation."
