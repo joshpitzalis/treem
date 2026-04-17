@@ -34,7 +34,7 @@ The MVP contribution score is intentionally simple:
 3. Open `chrome://extensions`
 4. Enable Developer Mode
 5. Click `Load unpacked`
-6. Select `/Users/jxsh/Desktop/discord-leaderboard/extension`
+6. Select the repo's `extension` folder: `/Users/jxsh/Desktop/projects/treem/extension`
 
 ## Project structure
 

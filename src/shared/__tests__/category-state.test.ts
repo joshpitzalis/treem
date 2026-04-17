@@ -119,6 +119,37 @@ describe("createCategoryAndAssign", () => {
     ])
   })
 
+  it("blocks categorizing reply messages", () => {
+    const state = createState({
+      messages: [
+        createMessage("guild-1:channel-1:message-1", {
+          isReply: true
+        })
+      ],
+      categories: [createCategoryRecord("Bug")]
+    })
+
+    expect(() =>
+      createCategoryAndAssign({
+        state,
+        guildId: "guild-1",
+        messageId: "guild-1:channel-1:message-1",
+        categoryName: "Docs",
+        now: "2026-04-16T12:05:00.000Z"
+      })
+    ).toThrowError("Only top-level messages can be categorized")
+
+    expect(() =>
+      assignMessageToCategory({
+        state,
+        guildId: "guild-1",
+        messageId: "guild-1:channel-1:message-1",
+        categoryId: "cat:guild-1:bug",
+        now: "2026-04-16T12:05:00.000Z"
+      })
+    ).toThrowError("Only top-level messages can be categorized")
+  })
+
   it("clears message assignment back to uncategorized", () => {
     const state = createState({
       categories: [createCategoryRecord("Bug")],

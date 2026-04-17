@@ -31,7 +31,7 @@ describe("storage category retention", () => {
     })
   })
 
-  it("keeps empty named categories after assignments are pruned", async () => {
+  it("removes categories that have no remaining assigned messages", async () => {
     await saveState(
       createState({
         messages: [],
@@ -57,15 +57,7 @@ describe("storage category retention", () => {
 
     const saved = await loadState()
 
-    expect(saved.categories).toEqual([
-      {
-        id: "cat:guild-1:bug",
-        guildId: "guild-1",
-        name: "Bug",
-        normalizedName: "bug",
-        createdAt: "2026-04-16T08:00:00.000Z"
-      }
-    ])
+    expect(saved.categories).toEqual([])
     expect(saved.messageCategoryAssignments).toEqual([])
   })
 })

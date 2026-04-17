@@ -110,7 +110,8 @@ export function summarizeTreemap(input: {
   categories: CategoryRecord[]
   messageCategoryAssignments: MessageCategoryAssignment[]
 }): TreemapSummary {
-  const totalMessages = input.messages.length
+  const topLevelMessages = input.messages.filter((message) => !message.isReply)
+  const totalMessages = topLevelMessages.length
 
   if (totalMessages === 0) {
     return {
@@ -131,7 +132,7 @@ export function summarizeTreemap(input: {
   const categoryCounts = new Map<string, number>()
   let uncategorizedCount = 0
 
-  for (const message of input.messages) {
+  for (const message of topLevelMessages) {
     const assignment = assignmentsByMessageId.get(message.id)
     if (!assignment) {
       uncategorizedCount += 1
@@ -147,8 +148,8 @@ export function summarizeTreemap(input: {
     categoryCounts.set(category.id, (categoryCounts.get(category.id) ?? 0) + 1)
   }
 
-  const tiles = Array.from(categoryCounts.entries())
-    .map(([categoryId, messageCount]) => {
+  const tiles = Array.from(categoryCounts.entries()).map(
+    ([categoryId, messageCount]) => {
       const category = categoriesById.get(categoryId)
       if (!category) {
         throw new Error(`Missing category for treemap tile: ${categoryId}`)
@@ -160,7 +161,8 @@ export function summarizeTreemap(input: {
         messageCount,
         percentage: roundPercentage((messageCount / totalMessages) * 100)
       }
-    })
+    }
+  )
 
   if (uncategorizedCount > 0) {
     tiles.push({

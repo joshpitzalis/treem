@@ -57,6 +57,10 @@ export async function saveState(nextState: LeaderboardState): Promise<void> {
     messages,
     categories
   })
+  const assignedCategories = pruneUnusedCategories(
+    categories,
+    messageCategoryAssignments
+  )
 
   await chrome.storage.local.set({
     [STORAGE_KEY]: {
@@ -64,7 +68,7 @@ export async function saveState(nextState: LeaderboardState): Promise<void> {
       viewerProfile: nextState.viewerProfile,
       scopeObservations: pruneExpiredObservations(nextState.scopeObservations),
       popupPreferences: nextState.popupPreferences,
-      categories,
+      categories: assignedCategories,
       messageCategoryAssignments,
       updatedAt: nextState.updatedAt
     }
@@ -210,6 +214,17 @@ function pruneMessageCategoryAssignments(input: {
   }
 
   return Array.from(byMessage.values())
+}
+
+function pruneUnusedCategories(
+  categories: CategoryRecord[],
+  assignments: MessageCategoryAssignment[]
+): CategoryRecord[] {
+  const assignedCategoryIds = new Set(
+    assignments.map((assignment) => assignment.categoryId)
+  )
+
+  return categories.filter((category) => assignedCategoryIds.has(category.id))
 }
 
 function isViewerProfile(value: unknown): value is ViewerProfile {

@@ -365,6 +365,171 @@ describe("categorization controls", () => {
       Array.from(existingCategorySelect.options).map((option) => option.text)
     ).toEqual(["Choose category", "Bug", "Uncategorized"])
   })
+
+  it("updates other mounted pickers when a new category is created", async () => {
+    const dom = new JSDOM(
+      `
+        <body>
+          <ol data-list-id="chat-messages">
+            <li id="chat-messages-message-1">
+              <article>
+                <div class="header">
+                  <time datetime="2026-04-16T10:00:00.000Z"></time>
+                </div>
+              </article>
+            </li>
+            <li id="chat-messages-message-2">
+              <article>
+                <div class="header">
+                  <time datetime="2026-04-16T10:05:00.000Z"></time>
+                </div>
+              </article>
+            </li>
+          </ol>
+        </body>
+      `,
+      { url: "https://discord.com/channels/guild-1/channel-1" }
+    )
+    const { window } = dom
+    let state = createState({
+      messages: [
+        createMessage(),
+        createMessage({
+          id: "guild-1:channel-1:message-2",
+          messageTimestamp: "2026-04-16T10:05:00.000Z",
+          capturedAt: "2026-04-16T10:05:00.000Z"
+        })
+      ]
+    })
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    await enhanceCategorizationControls({
+      document: window.document,
+      guildId: "guild-1",
+      loadState: async () => state,
+      saveState: async (nextState) => {
+        state = nextState
+      }
+    })
+
+    const toggles = window.document.querySelectorAll<HTMLButtonElement>(
+      '[data-treem-role="category-toggle"]'
+    )
+    expect(toggles).toHaveLength(2)
+    toggles[0]?.click()
+    toggles[1]?.click()
+
+    const selects = window.document.querySelectorAll<HTMLSelectElement>(
+      '[data-treem-role="category-select"]'
+    )
+    expect(selects).toHaveLength(2)
+    expect(
+      Array.from(selects[1]?.options ?? []).map((option) => option.text)
+    ).toEqual(["Choose category", "Uncategorized"])
+
+    const input = window.document.querySelector<HTMLInputElement>(
+      '[data-treem-role="category-name-input"]'
+    )
+    if (!input) throw new Error("Expected category input")
+    input.value = "Bug"
+
+    const form = window.document.querySelector<HTMLFormElement>(
+      '[data-treem-role="category-form"]'
+    )
+    if (!form) throw new Error("Expected category form")
+    form.dispatchEvent(
+      new window.Event("submit", { bubbles: true, cancelable: true })
+    )
+    await flushAsyncWork(window)
+
+    expect(
+      Array.from(selects[1]?.options ?? []).map((option) => option.text)
+    ).toEqual(["Choose category", "Bug", "Uncategorized"])
+  })
+
+  it("does not inject category controls for reply messages", async () => {
+    const dom = new JSDOM(
+      `
+        <body>
+          <ol data-list-id="chat-messages">
+            <li id="chat-messages-message-1">
+              <article>
+                <div class="header">
+                  <time datetime="2026-04-16T10:00:00.000Z"></time>
+                </div>
+              </article>
+            </li>
+          </ol>
+        </body>
+      `,
+      { url: "https://discord.com/channels/guild-1/channel-1" }
+    )
+    const { window } = dom
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    await enhanceCategorizationControls({
+      document: window.document,
+      guildId: "guild-1",
+      loadState: async () =>
+        createState({
+          messages: [
+            createMessage({
+              isReply: true
+            })
+          ]
+        }),
+      saveState: async () => {}
+    })
+
+    expect(
+      window.document.querySelector('[data-treem-role="category-control"]')
+    ).toBeNull()
+  })
+
+  it("does not inject category controls when the DOM row looks like a reply", async () => {
+    const dom = new JSDOM(
+      `
+        <body>
+          <ol data-list-id="chat-messages">
+            <li id="chat-messages-message-1">
+              <article>
+                <div class="repliedTextPreview">Replying to Alice</div>
+                <div class="header">
+                  <time datetime="2026-04-16T10:00:00.000Z"></time>
+                </div>
+              </article>
+            </li>
+          </ol>
+        </body>
+      `,
+      { url: "https://discord.com/channels/guild-1/channel-1" }
+    )
+    const { window } = dom
+
+    Object.assign(globalThis, {
+      document: window.document,
+      window
+    })
+
+    await enhanceCategorizationControls({
+      document: window.document,
+      guildId: "guild-1",
+      loadState: async () => createState(),
+      saveState: async () => {}
+    })
+
+    expect(
+      window.document.querySelector('[data-treem-role="category-control"]')
+    ).toBeNull()
+  })
 })
 
 function createState(

@@ -6,6 +6,7 @@ import {
   UNCATEGORIZED_CATEGORY_ID
 } from "../shared/category-state"
 import type { LeaderboardState } from "../shared/types"
+import { looksLikeReplyMessageNode } from "./message-parser"
 
 const MESSAGE_SELECTOR = [
   'li[id^="chat-messages-"]',
@@ -26,9 +27,11 @@ export async function enhanceCategorizationControls(
   ensureCategorizationStyles(runtime.document)
 
   const state = await runtime.loadState()
-  const capturedMessageIds = new Set(
+  const capturedTopLevelMessageIds = new Set(
     state.messages
-      .filter((message) => message.guildId === runtime.guildId)
+      .filter(
+        (message) => message.guildId === runtime.guildId && !message.isReply
+      )
       .map((message) => message.id)
   )
 
@@ -38,7 +41,7 @@ export async function enhanceCategorizationControls(
       enhanceMessageNode({
         runtime,
         state,
-        capturedMessageIds,
+        capturedTopLevelMessageIds,
         messageNode
       })
     })
@@ -47,20 +50,30 @@ export async function enhanceCategorizationControls(
 function enhanceMessageNode(input: {
   runtime: CategorizationRuntime
   state: LeaderboardState
-  capturedMessageIds: Set<string>
+  capturedTopLevelMessageIds: Set<string>
   messageNode: HTMLElement
 }): void {
   const messageId = extractMessageId(input.messageNode)
   if (!messageId) return
 
   const messageKey = `${input.runtime.guildId}:${readChannelId(input.runtime.document.location?.pathname)}:${messageId}`
-  if (!input.capturedMessageIds.has(messageKey)) return
-
   const headerNode =
     input.messageNode.querySelector("time")?.parentElement ?? input.messageNode
-  if (
-    headerNode.querySelector('[data-treem-role="category-control"]') != null
-  ) {
+  headerNode.classList.add("treem-category-anchor")
+  const existingControl = headerNode.querySelector<HTMLElement>(
+    '[data-treem-role="category-control"]'
+  )
+  if (looksLikeReplyMessageNode(input.messageNode)) {
+    existingControl?.remove()
+    return
+  }
+
+  if (!input.capturedTopLevelMessageIds.has(messageKey)) {
+    existingControl?.remove()
+    return
+  }
+
+  if (existingControl != null) {
     return
   }
 
@@ -89,6 +102,8 @@ function createControl(input: {
 } {
   const root = input.document.createElement("div")
   root.dataset.treemRole = "category-control"
+  root.dataset.treemGuildId = input.guildId
+  root.dataset.treemMessageId = input.messageId
   root.className = "treem-category-control"
   root.hidden = true
 
@@ -119,16 +134,12 @@ function createControl(input: {
     inputNode.setCustomValidity("")
   })
 
-  const submit = input.document.createElement("button")
-  submit.type = "submit"
-  submit.textContent = "Save"
-
   populateCategoryOptions({
     select: categorySelect,
     categories: listGuildCategories(input.state, input.guildId)
   })
 
-  form.append(categorySelect, inputNode, submit)
+  form.append(categorySelect, inputNode)
   root.append(toggle, form)
 
   toggle.addEventListener("click", () => {
@@ -150,15 +161,7 @@ function createControl(input: {
     })
 
     await input.saveState(nextState)
-    updateFormState({
-      state: nextState,
-      guildId: input.guildId,
-      messageId: input.messageId,
-      toggle,
-      categorySelect,
-      inputNode,
-      form
-    })
+    syncCategoryControls(input.document, nextState)
   })
 
   form.addEventListener("submit", async (event) => {
@@ -174,15 +177,7 @@ function createControl(input: {
 
       inputNode.setCustomValidity("")
       await input.saveState(nextState)
-      updateFormState({
-        state: nextState,
-        guildId: input.guildId,
-        messageId: input.messageId,
-        toggle,
-        categorySelect,
-        inputNode,
-        form
-      })
+      syncCategoryControls(input.document, nextState)
     } catch (error) {
       if (error instanceof Error) {
         inputNode.setCustomValidity(error.message)
@@ -233,6 +228,23 @@ function bindHoverState(messageNode: HTMLElement, control: HTMLElement): void {
 }
 
 function extractMessageId(node: HTMLElement): string | null {
+  const labelledBy = node.getAttribute("aria-labelledby")
+  const labelledByMatch = labelledBy?.match(
+    /message-(?:username|content|timestamp)-(\d+)/
+  )
+  if (labelledByMatch?.[1]) {
+    return labelledByMatch[1]
+  }
+
+  const descendantIdMatch = node
+    .querySelector<HTMLElement>(
+      '[id^="message-username-"], [id^="message-content-"], [id^="message-timestamp-"]'
+    )
+    ?.id.match(/message-(?:username|content|timestamp)-(\d+)/)
+  if (descendantIdMatch?.[1]) {
+    return descendantIdMatch[1]
+  }
+
   if (node.id.startsWith("chat-messages-")) {
     return node.id.replace("chat-messages-", "")
   }
@@ -256,13 +268,25 @@ function ensureCategorizationStyles(document: Document): void {
   style.id = "treem-category-styles"
   style.textContent = `
     .treem-category-control {
+      position: absolute;
+      inset-inline-start: calc(100% + 8px);
+      top: 50%;
+      transform: translateY(-50%);
       display: inline-flex;
       gap: 6px;
-      margin-inline-start: 8px;
       align-items: center;
+      white-space: nowrap;
+      z-index: 2;
     }
-    .treem-category-toggle,
-    .treem-category-form button {
+    .treem-category-control[hidden],
+    .treem-category-form[hidden] {
+      display: none !important;
+    }
+    .treem-category-anchor {
+      position: relative;
+      display: inline-block;
+    }
+    .treem-category-toggle {
       border: 1px solid rgba(255, 255, 255, 0.24);
       background: rgba(88, 101, 242, 0.16);
       color: inherit;
@@ -344,6 +368,43 @@ function updateFormState(input: {
   input.categorySelect.value = ""
   input.inputNode.value = ""
   input.form.hidden = true
+}
+
+function syncCategoryControls(
+  document: Document,
+  state: LeaderboardState
+): void {
+  document
+    .querySelectorAll<HTMLElement>('[data-treem-role="category-control"]')
+    .forEach((root) => {
+      const guildId = root.dataset.treemGuildId
+      const messageId = root.dataset.treemMessageId
+      if (!guildId || !messageId) return
+
+      const toggle = root.querySelector<HTMLButtonElement>(
+        '[data-treem-role="category-toggle"]'
+      )
+      const categorySelect = root.querySelector<HTMLSelectElement>(
+        '[data-treem-role="category-select"]'
+      )
+      const inputNode = root.querySelector<HTMLInputElement>(
+        '[data-treem-role="category-name-input"]'
+      )
+      const form = root.querySelector<HTMLFormElement>(
+        '[data-treem-role="category-form"]'
+      )
+      if (!toggle || !categorySelect || !inputNode || !form) return
+
+      updateFormState({
+        state,
+        guildId,
+        messageId,
+        toggle,
+        categorySelect,
+        inputNode,
+        form
+      })
+    })
 }
 
 function escapeHtml(value: string): string {

@@ -23,7 +23,7 @@ export function createCategoryAndAssign(input: {
   }
 
   const now = input.now ?? new Date().toISOString()
-  assertMessageInGuild(input.state, input.guildId, input.messageId)
+  assertMessageCanBeCategorized(input.state, input.guildId, input.messageId)
   const normalizedName = normalizeCategoryName(categoryName)
   assertCategoryNameAvailable(input.state, input.guildId, normalizedName)
   const category = createCategory({
@@ -71,7 +71,7 @@ export function assignMessageToCategory(input: {
   assignment: MessageCategoryAssignment
 } {
   const now = input.now ?? new Date().toISOString()
-  assertMessageInGuild(input.state, input.guildId, input.messageId)
+  assertMessageCanBeCategorized(input.state, input.guildId, input.messageId)
   assertCategoryInGuild(input.state, input.guildId, input.categoryId)
 
   const assignment = createAssignment({
@@ -173,10 +173,23 @@ function assertMessageInGuild(
   state: LeaderboardState,
   guildId: string,
   messageId: string
-): void {
+): NonNullable<LeaderboardState["messages"][number]> {
   const message = state.messages.find((candidate) => candidate.id === messageId)
   if (!message || message.guildId !== guildId) {
     throw new Error("Message must exist in selected server before assignment")
+  }
+
+  return message
+}
+
+function assertMessageCanBeCategorized(
+  state: LeaderboardState,
+  guildId: string,
+  messageId: string
+): void {
+  const message = assertMessageInGuild(state, guildId, messageId)
+  if (message.isReply) {
+    throw new Error("Only top-level messages can be categorized")
   }
 }
 

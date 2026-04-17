@@ -12,6 +12,17 @@ const MESSAGE_SELECTOR = [
   '[data-list-item-id^="chat-messages_"]'
 ].join(",")
 
+const REPLY_MARKER_SELECTOR = [
+  '[id^="message-reply-context-"]',
+  '[class*="repliedMessage"]',
+  '[class*="replyBadge"]',
+  '[class*="repliedTextPreview"]',
+  '[class*="repliedTextContent"]',
+  '[class*="repliedTextPlaceholder"]',
+  '[class*="replyAvatar"]',
+  '[aria-label^="Replying to"]'
+].join(", ")
+
 export function detectCurrentCommunity(): CommunityRef | null {
   const match = window.location.pathname.match(/^\/channels\/([^/]+)\/([^/]+)/)
   if (!match) return null
@@ -33,7 +44,7 @@ export function extractVisibleMessages(
   community: CommunityRef
 ): ContributionMessage[] {
   const nodes = document.querySelectorAll<HTMLElement>(MESSAGE_SELECTOR)
-  const messages: ContributionMessage[] = []
+  const messagesById = new Map<string, ContributionMessage>()
   let previousAuthor: {
     authorName: string
     authorAvatarUrl: string | null
@@ -41,7 +52,9 @@ export function extractVisibleMessages(
 
   nodes.forEach((node) => {
     const parsed = parseMessageNode(node, community, previousAuthor)
-    if (parsed) messages.push(parsed)
+    if (parsed) {
+      messagesById.set(parsed.id, parsed)
+    }
 
     const explicitAuthorName = readAuthorName(node)
     if (explicitAuthorName) {
@@ -52,7 +65,7 @@ export function extractVisibleMessages(
     }
   })
 
-  return messages
+  return Array.from(messagesById.values())
 }
 
 export function detectViewerProfile(): ViewerProfile | null {
@@ -101,7 +114,7 @@ function parseMessageNode(
   const contentLength = readContentLength(node)
   const reactionCount = readReactionCount(node)
   const attachmentCount = countAttachments(node)
-  const isReply = looksLikeReply(node)
+  const isReply = looksLikeReplyMessageNode(node)
   const score = scoreMessage({
     contentLength,
     reactionCount,
@@ -129,15 +142,36 @@ function parseMessageNode(
 }
 
 function extractMessageId(node: HTMLElement): string | null {
-  if (node.id.startsWith("chat-messages-")) {
-    return node.id.replace("chat-messages-", "")
+  const labelledBy = node.getAttribute("aria-labelledby")
+  const labelledByMatch = labelledBy?.match(
+    /message-(?:username|content|timestamp)-(\d+)/
+  )
+  if (labelledByMatch?.[1]) {
+    return labelledByMatch[1]
+  }
+
+  const descendantIdMatch = node
+    .querySelector<HTMLElement>(
+      '[id^="message-username-"], [id^="message-content-"], [id^="message-timestamp-"]'
+    )
+    ?.id.match(/message-(?:username|content|timestamp)-(\d+)/)
+  if (descendantIdMatch?.[1]) {
+    return descendantIdMatch[1]
+  }
+
+  if (node.id) {
+    return normalizeMessageId(node.id)
   }
 
   const dataListItemId = node.dataset.listItemId
   if (!dataListItemId) return null
 
   const parts = dataListItemId.split("_")
-  return parts.length > 0 ? parts[parts.length - 1] : null
+  return parts.length > 0 ? normalizeMessageId(parts[parts.length - 1]) : null
+}
+
+function normalizeMessageId(value: string): string {
+  return value.replace(/^chat-messages-/, "")
 }
 
 function readAuthorName(node: HTMLElement): string | null {
@@ -210,11 +244,10 @@ function countAttachments(node: HTMLElement): number {
     : 0
 }
 
-function looksLikeReply(node: HTMLElement): boolean {
-  return Boolean(
-    node.querySelector(
-      '[id^="message-reply-context-"], [class*="repliedMessage"], [class*="replyBadge"]'
-    )
+export function looksLikeReplyMessageNode(node: HTMLElement): boolean {
+  return (
+    node.matches(REPLY_MARKER_SELECTOR) ||
+    node.querySelector(REPLY_MARKER_SELECTOR) != null
   )
 }
 

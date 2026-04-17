@@ -239,11 +239,40 @@ describe("summarizeTreemap", () => {
       tiles: []
     })
   })
+
+  it("ignores reply messages in category composition", () => {
+    expect(
+      summarizeTreemap({
+        messages: [
+          createMessage("m-top", "2026-04-16T10:00:00.000Z"),
+          createMessage("m-reply", "2026-04-16T09:00:00.000Z", {
+            isReply: true
+          })
+        ],
+        categories: [createCategory("cat-bug", "Bug")],
+        messageCategoryAssignments: [
+          createAssignment("m-top", "cat-bug"),
+          createAssignment("m-reply", "cat-bug")
+        ]
+      })
+    ).toEqual({
+      totalMessages: 1,
+      tiles: [
+        {
+          id: "cat-bug",
+          label: "Bug",
+          messageCount: 1,
+          percentage: 100
+        }
+      ]
+    })
+  })
 })
 
 function createMessage(
   id: string,
-  messageTimestamp: string
+  messageTimestamp: string,
+  overrides: Partial<ContributionMessage> = {}
 ): ContributionMessage {
   return {
     id,
@@ -260,7 +289,8 @@ function createMessage(
     reactionCount: 0,
     attachmentCount: 0,
     isReply: false,
-    score: 1
+    score: 1,
+    ...overrides
   }
 }
 
