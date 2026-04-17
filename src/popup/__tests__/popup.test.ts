@@ -164,6 +164,49 @@ describe("popup React app", () => {
     )
   })
 
+  it("renders no-server and slice-empty states with popup parity copy", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createEmptyState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    let page = within(window.document.body)
+
+    expect(page.getByLabelText("Server")).toHaveProperty("disabled", true)
+    expect(page.getByLabelText("Channel")).toHaveProperty("disabled", true)
+    expect(page.getByTestId("leaderboard").textContent ?? "").toMatch(
+      /No contributors captured yet\./
+    )
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /No server selected yet[\s\S]*Capture Discord messages to see category composition\./
+    )
+    expect(window.document.querySelector("#status")?.textContent ?? "").toBe(
+      "Open Discord in Chrome and browse a server to start collecting data."
+    )
+
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createPastOnlyState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    page = within(window.document.body)
+    fireEvent.click(page.getByRole("button", { name: "24h" }))
+
+    expect(page.getByTestId("leaderboard").textContent ?? "").toMatch(
+      /No contributors captured for this slice yet\./
+    )
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /No captured messages in this slice yet\./
+    )
+  })
+
   it("applies latest storage change after in-flight refresh", async () => {
     const { window } = createPopupDom()
     const originalSetTimeout = window.setTimeout.bind(window)
@@ -250,6 +293,82 @@ describe("popup React app", () => {
     expect(
       window.document.querySelector("#sync-status")?.textContent ?? ""
     ).toBe("")
+  })
+
+  it("shows updating and updated sync status during storage refresh", async () => {
+    const { window } = createPopupDom()
+    const originalSetTimeout = window.setTimeout.bind(window)
+    let storageListener = (
+      _changes: Record<string, unknown>,
+      _areaName: string
+    ) => {}
+    const scheduledTimeouts: Array<() => void> = []
+    let loadStateCallCount = 0
+    let resolveBlockedLoadState = (_state: LeaderboardState) => {}
+
+    window.setTimeout = ((handler: TimerHandler) => {
+      if (typeof handler === "function") {
+        scheduledTimeouts.push(handler as () => void)
+      }
+
+      return 0
+    }) as typeof window.setTimeout
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => {
+        loadStateCallCount += 1
+
+        if (loadStateCallCount === 1) {
+          return createState()
+        }
+
+        return await new Promise<LeaderboardState>((resolve) => {
+          resolveBlockedLoadState = resolve
+        })
+      },
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: (listener) => {
+        storageListener = listener
+      }
+    })
+
+    storageListener({ discordLeaderboardState: {} }, "local")
+
+    await waitFor(() => {
+      expect(
+        window.document.querySelector("#sync-status")?.textContent ?? ""
+      ).toBe("Updating...")
+      expect(window.document.querySelector("#status")?.textContent ?? "").toBe(
+        ""
+      )
+    })
+
+    resolveBlockedLoadState(createState())
+    await waitFor(() => {
+      expect(scheduledTimeouts.length).toBeGreaterThan(0)
+    })
+    scheduledTimeouts.shift()?.()
+    await new Promise((resolve) => originalSetTimeout(resolve, 0))
+
+    await waitFor(() => {
+      expect(
+        window.document.querySelector("#sync-status")?.textContent ?? ""
+      ).toBe("Updated")
+    })
+
+    await waitFor(() => {
+      expect(scheduledTimeouts.length).toBeGreaterThan(0)
+    })
+    scheduledTimeouts.shift()?.()
+    await new Promise((resolve) => originalSetTimeout(resolve, 0))
+
+    await waitFor(() => {
+      expect(
+        window.document.querySelector("#sync-status")?.textContent ?? ""
+      ).toBe("")
+    })
   })
 })
 
@@ -499,6 +618,54 @@ function createMixedCompositionState(): LeaderboardState {
       }
     ],
     updatedAt: "2026-04-16T12:00:00.000Z"
+  }
+}
+
+function createEmptyState(): LeaderboardState {
+  return {
+    messages: [],
+    viewerProfile: null,
+    scopeObservations: [],
+    popupPreferences: null,
+    categories: [],
+    messageCategoryAssignments: [],
+    updatedAt: null
+  }
+}
+
+function createPastOnlyState(): LeaderboardState {
+  return {
+    ...createState(),
+    messages: [
+      createMessage({
+        id: "old-1",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-1",
+        channelName: "alpha",
+        authorKey: "alice",
+        authorName: "Alice",
+        messageTimestamp: "2026-04-10T10:00:00.000Z"
+      }),
+      createMessage({
+        id: "old-2",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-2",
+        channelName: "beta",
+        authorKey: "bob",
+        authorName: "Bob",
+        messageTimestamp: "2026-04-09T10:00:00.000Z"
+      })
+    ],
+    messageCategoryAssignments: [
+      {
+        messageId: "old-1",
+        guildId: "guild-1",
+        categoryId: "cat-bug",
+        assignedAt: "2026-04-10T10:05:00.000Z"
+      }
+    ]
   }
 }
 

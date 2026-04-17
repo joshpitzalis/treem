@@ -428,7 +428,11 @@ function PopupApp(input: {
       </section>
 
       <section id="treemap" data-testid="treemap" className="treemap">
-        <TreemapSection scopeLabel={scopeLabel} summary={treemapSummary} />
+        <TreemapSection
+          hasSelectedGuild={selectedGuildId != null}
+          scopeLabel={scopeLabel}
+          summary={treemapSummary}
+        />
       </section>
     </main>
   )
@@ -575,10 +579,14 @@ function ContributorCard(input: {
 }
 
 function TreemapSection(input: {
+  hasSelectedGuild: boolean
   scopeLabel: string
   summary: TreemapSummary
 }) {
   const layout = createTreemapLayout(input.summary)
+  const emptyCopy = input.hasSelectedGuild
+    ? "No captured messages in this slice yet."
+    : "Capture Discord messages to see category composition."
 
   return (
     <>
@@ -588,9 +596,7 @@ function TreemapSection(input: {
       </div>
       <div className="treemap-frame">
         {input.summary.totalMessages === 0 ? (
-          <div className="treemap-empty">
-            Capture Discord messages to see category composition.
-          </div>
+          <div className="treemap-empty">{emptyCopy}</div>
         ) : (
           <div
             className="treemap-chart"
