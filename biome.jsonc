@@ -7,11 +7,11 @@
     "ignoreUnknown": true,
     "includes": [
       "src/**/*.ts",
+      "src/**/*.css",
       "scripts/**/*.mjs",
       "package.json",
       "tsconfig.json",
       "extension/manifest.json",
-      "extension/popup.css",
       "extension/popup.html",
       "README.md"
     ]
@@ -32,6 +32,11 @@
       "quoteStyle": "double",
       "semicolons": "asNeeded",
       "trailingCommas": "none"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
     }
   },
   "assist": {

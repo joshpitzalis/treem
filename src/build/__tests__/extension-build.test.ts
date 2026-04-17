@@ -27,13 +27,19 @@ describe("buildExtension", () => {
     ).resolves.toContain('"default_popup": "popup.html"')
     await expect(
       readFile(path.join(outDir, "popup.html"), "utf8")
+    ).resolves.toContain('<link rel="stylesheet" href="popup/popup.css" />')
+    await expect(
+      readFile(path.join(outDir, "popup.html"), "utf8")
     ).resolves.toContain('<script src="popup/popup.js"></script>')
     await expect(
-      readFile(path.join(outDir, "popup.css"), "utf8")
+      readFile(path.join(outDir, "popup/popup.css"), "utf8")
     ).resolves.toContain(".app-shell")
     await expect(
       readFile(path.join(outDir, "capture/content.js"), "utf8")
     ).resolves.toContain("MutationObserver")
+    await expect(
+      readFile(path.join(outDir, "capture/content.js"), "utf8")
+    ).resolves.toContain(".treem-category-control")
     await expect(
       readFile(path.join(outDir, "popup/popup.js"), "utf8")
     ).resolves.toContain("bootstrapPopup")

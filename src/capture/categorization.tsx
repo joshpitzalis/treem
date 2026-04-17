@@ -2,6 +2,7 @@ import { flushSync } from "react-dom"
 import { createRoot, type Root } from "react-dom/client"
 import type { LeaderboardState } from "../shared/types"
 import { looksLikeReplyMessageNode } from "./message-parser"
+import categoryControlStyles from "./discord-categorization-control.css?inline"
 import { DiscordCategorizationControl } from "./discord-categorization-control"
 
 const MESSAGE_SELECTOR = [
@@ -161,64 +162,7 @@ function getOrCreateRoot(host: HTMLElement): Root {
   const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" })
   shadowRoot.innerHTML = `
     <style>
-      :host {
-        position: absolute;
-        inset-inline-start: calc(100% + 8px);
-        top: 50%;
-        transform: translateY(-50%);
-        z-index: 2;
-      }
-      .treem-category-control {
-        display: inline-flex;
-        gap: 6px;
-        align-items: center;
-        white-space: nowrap;
-      }
-      .treem-category-picker,
-      .treem-category-create-form {
-        display: inline-flex;
-        gap: 6px;
-        align-items: center;
-      }
-      .treem-category-picker {
-        flex-wrap: wrap;
-      }
-      .treem-category-toggle,
-      .treem-category-select,
-      .treem-category-create-toggle,
-      .treem-category-create-input,
-      .treem-category-create-submit {
-        min-width: 120px;
-        border-radius: 999px;
-        border: 1px solid rgba(255, 255, 255, 0.24);
-        color: inherit;
-        font: inherit;
-      }
-      .treem-category-toggle {
-        background: rgba(88, 101, 242, 0.16);
-        padding: 2px 8px;
-        cursor: pointer;
-      }
-      .treem-category-select {
-        background: rgba(0, 0, 0, 0.2);
-        padding: 2px 10px;
-      }
-      .treem-category-create-toggle,
-      .treem-category-create-submit {
-        background: rgba(88, 101, 242, 0.12);
-        padding: 2px 10px;
-        cursor: pointer;
-      }
-      .treem-category-create-input {
-        min-width: 140px;
-        background: rgba(0, 0, 0, 0.2);
-        padding: 2px 10px;
-      }
-      .treem-category-create-error {
-        margin: 0;
-        color: #ffb3ba;
-        font-size: 12px;
-      }
+      ${categoryControlStyles}
     </style>
     <div data-treem-role="category-root"></div>
   `

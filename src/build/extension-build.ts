@@ -1,6 +1,7 @@
 import { cp, mkdir, readdir } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import tailwindcss from "@tailwindcss/vite"
 import { build, type InlineConfig } from "vite"
 
 const projectRoot = path.resolve(
@@ -9,7 +10,11 @@ const projectRoot = path.resolve(
 )
 const extensionSourceDir = path.join(projectRoot, "extension")
 
-const generatedBundlePaths = new Set(["capture/content.js", "popup/popup.js"])
+const generatedBundlePaths = new Set([
+  "capture/content.js",
+  "popup/popup.css",
+  "popup/popup.js"
+])
 
 const buildTargets = [
   {
@@ -20,7 +25,8 @@ const buildTargets = [
   {
     entryPath: "src/popup/popup.tsx",
     outputPath: "popup/popup.js",
-    bundleName: "TreemPopupBundle"
+    bundleName: "TreemPopupBundle",
+    cssFileName: "popup/popup"
   }
 ] as const
 
@@ -47,12 +53,14 @@ export async function buildExtension(
 
 function createTargetConfig({
   bundleName,
+  cssFileName,
   entryPath,
   outDir,
   outputPath,
   watch
 }: {
   bundleName: string
+  cssFileName?: string
   entryPath: string
   outDir: string
   outputPath: string
@@ -64,6 +72,7 @@ function createTargetConfig({
     build: {
       emptyOutDir: false,
       lib: {
+        ...(cssFileName ? { cssFileName } : {}),
         entry: path.join(projectRoot, entryPath),
         formats: ["iife"],
         name: bundleName
@@ -79,7 +88,8 @@ function createTargetConfig({
       target: "es2020",
       watch: watch ? {} : null
     },
-    logLevel: "info"
+    logLevel: "info",
+    plugins: [tailwindcss()]
   }
 }
 

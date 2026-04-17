@@ -1,0 +1,295 @@
+@import "tailwindcss";
+
+@theme {
+  --color-treem-panel: rgba(255, 250, 242, 0.94);
+  --color-treem-panel-strong: rgba(255, 248, 240, 0.98);
+  --color-treem-ink: #1f1a17;
+  --color-treem-muted: #6f6256;
+  --color-treem-accent: #d56f3e;
+  --color-treem-accent-strong: #a9471d;
+  --color-treem-accent-soft: rgba(213, 111, 62, 0.12);
+  --color-treem-border: rgba(72, 48, 33, 0.14);
+  --color-treem-ready-bg: rgba(42, 119, 73, 0.12);
+  --color-treem-ready-ink: #295b3b;
+  --color-treem-scroll-bg: rgba(179, 109, 27, 0.14);
+  --color-treem-scroll-ink: #915912;
+  --color-treem-stale-bg: rgba(120, 79, 40, 0.12);
+  --color-treem-stale-ink: #6f4a24;
+  --shadow-treem-card: 0 18px 40px rgba(62, 38, 25, 0.12);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    min-width: 420px;
+    margin: 0;
+    background:
+      radial-gradient(
+        circle at top left,
+        rgba(213, 111, 62, 0.16),
+        transparent 36%
+      ),
+      linear-gradient(180deg, #f8f2ea 0%, #efe6db 100%);
+    color: var(--color-treem-ink);
+    font-family: Georgia, "Times New Roman", serif;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply p-[18px];
+  }
+
+  .controls,
+  .leaderboard,
+  .treemap {
+    @apply rounded-[18px] border border-treem-border bg-treem-panel shadow-[var(--shadow-treem-card)];
+  }
+
+  .leaderboard,
+  .treemap {
+    @apply mt-[14px] p-[10px];
+  }
+
+  .controls {
+    @apply p-[14px];
+  }
+
+  .controls-header {
+    @apply flex items-start justify-between gap-3;
+  }
+
+  .eyebrow {
+    @apply mb-1.5 text-xs font-bold tracking-[0.08em] uppercase text-treem-accent-strong;
+  }
+
+  .controls h1,
+  .leaderboard-title,
+  .treemap-title {
+    @apply m-0;
+  }
+
+  .controls h1 {
+    @apply text-[26px] leading-[1.05];
+  }
+
+  .field-group {
+    @apply mt-3;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-xs font-bold tracking-[0.08em] uppercase;
+  }
+
+  .ghost-button,
+  .time-tab,
+  select {
+    font: inherit;
+  }
+
+  .ghost-button,
+  .time-tab {
+    @apply cursor-pointer;
+  }
+
+  .ghost-button {
+    @apply rounded-full border border-treem-border bg-white/75 px-2.5 py-[7px] text-xs font-bold text-treem-accent-strong hover:bg-white/95;
+  }
+
+  select {
+    @apply w-full rounded-xl border border-treem-border bg-[#fffaf4] px-3 py-2.5 text-treem-ink;
+  }
+
+  .readiness-strip {
+    @apply mt-3 grid grid-cols-3 gap-2;
+  }
+
+  .readiness-chip {
+    @apply rounded-full px-2 py-1 text-center text-[11px] font-bold whitespace-nowrap;
+  }
+
+  .readiness-chip.is-ready {
+    @apply bg-treem-ready-bg text-treem-ready-ink;
+  }
+
+  .readiness-chip.is-scroll {
+    @apply bg-treem-scroll-bg text-treem-scroll-ink;
+  }
+
+  .readiness-chip.is-stale {
+    @apply bg-treem-stale-bg text-treem-stale-ink;
+  }
+
+  .score-info {
+    @apply mt-3 rounded-xl border border-treem-border bg-treem-panel-strong p-3;
+  }
+
+  .score-info-title {
+    @apply mb-2 text-[13px] font-bold;
+  }
+
+  .score-info-list {
+    @apply m-0 pl-[18px] text-[13px] leading-[1.45] text-treem-muted;
+  }
+
+  .status {
+    @apply mt-2.5 mb-0 text-[13px] leading-[1.4] text-treem-muted;
+  }
+
+  .sync-status {
+    @apply mt-2.5 mb-0 text-xs font-bold tracking-[0.02em] text-treem-accent-strong;
+  }
+
+  .leaderboard-header,
+  .treemap-header {
+    @apply px-1 pt-1 pb-2.5;
+  }
+
+  .leaderboard-subtitle,
+  .treemap-subtitle {
+    @apply mt-1 mb-0 text-[13px] text-treem-muted;
+  }
+
+  .time-tabs {
+    @apply mt-3 grid grid-cols-3 gap-2;
+  }
+
+  .time-tab {
+    @apply rounded-xl border border-treem-border bg-white/72 px-3 py-2.5 text-[13px] font-bold text-treem-muted hover:bg-white/95;
+  }
+
+  .time-tab.is-active {
+    @apply border-transparent bg-linear-to-br from-treem-accent to-[#edb562] text-white;
+  }
+
+  .leader-card,
+  .empty-state,
+  .gap-card,
+  .treemap-frame {
+    @apply rounded-[14px] border border-[rgba(72,48,33,0.08)] bg-white/70;
+  }
+
+  .leader-card,
+  .empty-state {
+    @apply grid grid-cols-[42px_48px_1fr_auto] items-center gap-3 p-3;
+  }
+
+  .leader-card + .leader-card,
+  .you-divider + .leader-card,
+  .gap-card {
+    @apply mt-2;
+  }
+
+  .leader-card.is-viewer {
+    @apply border-treem-accent bg-treem-accent-soft;
+  }
+
+  .leader-rank {
+    @apply text-base font-bold text-treem-accent-strong;
+  }
+
+  .avatar,
+  .avatar-fallback {
+    @apply h-12 w-12 rounded-full;
+  }
+
+  .avatar {
+    @apply object-cover;
+  }
+
+  .avatar-fallback {
+    @apply grid place-items-center bg-[rgba(213,111,62,0.16)] text-lg font-bold text-treem-accent-strong;
+  }
+
+  .leader-main {
+    @apply min-w-0;
+  }
+
+  .leader-name-row {
+    @apply flex items-center gap-2;
+  }
+
+  .leader-name {
+    @apply truncate text-[15px] font-bold;
+  }
+
+  .you-pill {
+    @apply rounded-full bg-white/85 px-2 py-0.5 text-[11px] font-bold text-treem-accent-strong;
+  }
+
+  .leader-meta {
+    @apply mt-1 text-[12px] text-treem-muted;
+  }
+
+  .leader-trailing {
+    @apply text-right text-[11px] text-treem-muted;
+  }
+
+  .you-divider {
+    @apply mt-3 px-1 text-[11px] font-bold tracking-[0.08em] uppercase text-treem-muted;
+  }
+
+  .gap-card {
+    @apply p-3;
+  }
+
+  .gap-title {
+    @apply m-0 text-xs font-bold tracking-[0.08em] uppercase text-treem-accent-strong;
+  }
+
+  .gap-value {
+    @apply mt-2 mb-0 text-[18px] font-bold;
+  }
+
+  .gap-copy {
+    @apply mt-1 mb-0 text-[12px] text-treem-muted;
+  }
+
+  .empty-state {
+    @apply text-[14px] leading-[1.45] text-treem-muted;
+  }
+
+  .treemap-frame {
+    @apply p-3;
+  }
+
+  .treemap-empty {
+    @apply grid min-h-[240px] place-items-center text-center text-[14px] leading-[1.45] text-treem-muted;
+  }
+
+  .treemap-chart {
+    @apply relative aspect-square overflow-hidden rounded-xl bg-[rgba(255,255,255,0.65)];
+  }
+
+  .treemap-tile {
+    @apply absolute flex flex-col justify-end overflow-hidden rounded-xl border border-white/60 bg-linear-to-br from-[#d56f3e] to-[#edb562] p-2.5 text-white shadow-[0_10px_24px_rgba(84,45,17,0.18)];
+  }
+
+  .treemap-tile.is-medium {
+    @apply p-2;
+  }
+
+  .treemap-tile.is-small {
+    @apply p-1.5;
+  }
+
+  .treemap-tile.is-tiny {
+    @apply p-1;
+  }
+
+  .treemap-tile-name {
+    @apply m-0 text-[13px] leading-tight font-bold;
+  }
+
+  .treemap-tile-count,
+  .treemap-tile-share {
+    @apply m-0 text-[11px] leading-tight text-white/90;
+  }
+}
