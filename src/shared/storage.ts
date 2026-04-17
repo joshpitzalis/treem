@@ -29,7 +29,9 @@ export async function loadState(): Promise<LeaderboardState> {
 
   const state = stored as Partial<LeaderboardState>
   return {
-    messages: Array.isArray(state.messages) ? state.messages : [],
+    messages: Array.isArray(state.messages)
+      ? state.messages.filter(isContributionMessage)
+      : [],
     viewerProfile: isViewerProfile(state.viewerProfile)
       ? state.viewerProfile
       : null,
@@ -170,6 +172,31 @@ function pruneExpiredMessages(
     const timestamp = Date.parse(message.messageTimestamp || message.capturedAt)
     return Number.isFinite(timestamp) && timestamp >= cutoff
   })
+}
+
+function isContributionMessage(value: unknown): value is ContributionMessage {
+  if (!value || typeof value !== "object") return false
+
+  const candidate = value as Partial<ContributionMessage>
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.guildId === "string" &&
+    typeof candidate.guildName === "string" &&
+    typeof candidate.channelId === "string" &&
+    typeof candidate.channelName === "string" &&
+    typeof candidate.authorKey === "string" &&
+    typeof candidate.authorName === "string" &&
+    (candidate.authorAvatarUrl === null ||
+      typeof candidate.authorAvatarUrl === "string") &&
+    typeof candidate.messageTimestamp === "string" &&
+    typeof candidate.capturedAt === "string" &&
+    typeof candidate.contentLength === "number" &&
+    typeof candidate.reactionCount === "number" &&
+    typeof candidate.attachmentCount === "number" &&
+    typeof candidate.isReply === "boolean" &&
+    typeof candidate.score === "number"
+  )
 }
 
 function pruneExpiredObservations(

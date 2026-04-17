@@ -44,6 +44,12 @@ describe("buildExtension", () => {
       readFile(path.join(outDir, "popup/popup.js"), "utf8")
     ).resolves.toContain("bootstrapPopup")
     await expect(
+      readFile(path.join(outDir, "popup/popup.js"), "utf8")
+    ).resolves.not.toContain("process.env.NODE_ENV")
+    await expect(
+      readFile(path.join(outDir, "popup/popup.js"), "utf8")
+    ).resolves.not.toContain("process is not defined")
+    await expect(
       readFile(path.join(outDir, "icons/icon-16.png"))
     ).resolves.toBeInstanceOf(Buffer)
   })

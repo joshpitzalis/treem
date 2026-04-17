@@ -41,7 +41,8 @@ function renderAllMessageControls(
   const capturedTopLevelMessageIds = new Set(
     state.messages
       .filter(
-        (message) => message.guildId === runtime.guildId && !message.isReply
+        (message) =>
+          message.guildId === runtime.guildId && message.isReply === false
       )
       .map((message) => message.id)
   )

@@ -60,6 +60,33 @@ describe("storage category retention", () => {
     expect(saved.categories).toEqual([])
     expect(saved.messageCategoryAssignments).toEqual([])
   })
+
+  it("drops legacy messages that do not carry an explicit reply flag", async () => {
+    storage.set("discordLeaderboardState", {
+      messages: [
+        {
+          id: "guild-1:channel-1:message-1",
+          guildId: "guild-1",
+          guildName: "Guild One",
+          channelId: "channel-1",
+          channelName: "alpha",
+          authorKey: "author-1",
+          authorName: "Alice",
+          authorAvatarUrl: null,
+          messageTimestamp: "2026-04-16T10:00:00.000Z",
+          capturedAt: "2026-04-16T10:00:00.000Z",
+          contentLength: 42,
+          reactionCount: 0,
+          attachmentCount: 0,
+          score: 1
+        }
+      ]
+    })
+
+    const saved = await loadState()
+
+    expect(saved.messages).toEqual([])
+  })
 })
 
 function createState(

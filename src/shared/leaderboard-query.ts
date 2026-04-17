@@ -110,7 +110,9 @@ export function summarizeTreemap(input: {
   categories: CategoryRecord[]
   messageCategoryAssignments: MessageCategoryAssignment[]
 }): TreemapSummary {
-  const topLevelMessages = input.messages.filter((message) => !message.isReply)
+  const topLevelMessages = input.messages.filter(
+    (message) => message.isReply === false
+  )
   const totalMessages = topLevelMessages.length
 
   if (totalMessages === 0) {
