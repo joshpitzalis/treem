@@ -6,26 +6,46 @@ import {
   listGuildCategories,
   UNCATEGORIZED_CATEGORY_ID
 } from "../shared/category-state"
+import { createCategoryPalette } from "../shared/category-palette"
 import type { LeaderboardState } from "../shared/types"
+import { BadgeButton } from "./badge"
 
 interface DiscordCategorizationControlProps {
   guildId: string
   messageId: string
   state: LeaderboardState
   onStateChange: (state: LeaderboardState) => Promise<void>
+  onUiStateChange?: () => void
 }
+
+interface CategoryControlDraft {
+  isPickerOpen: boolean
+  isCreateFormOpen: boolean
+  newCategoryName: string
+}
+
+const categoryControlDrafts = new Map<string, CategoryControlDraft>()
 
 export function DiscordCategorizationControl(
   props: DiscordCategorizationControlProps
 ) {
-  const [isPickerOpen, setIsPickerOpen] = useState(false)
-  const [isCreateFormOpen, setIsCreateFormOpen] = useState(false)
-  const [newCategoryName, setNewCategoryName] = useState("")
+  const initialDraft = readCategoryControlDraft(props.messageId)
+  const [isPickerOpen, setIsPickerOpen] = useState(initialDraft.isPickerOpen)
+  const [isCreateFormOpen, setIsCreateFormOpen] = useState(
+    initialDraft.isCreateFormOpen
+  )
+  const [newCategoryName, setNewCategoryName] = useState(
+    initialDraft.newCategoryName
+  )
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const newCategoryInputRef = useRef<HTMLInputElement>(null)
 
   const categories = listGuildCategories(props.state, props.guildId)
-  const currentLabel = readCurrentCategoryLabel(props.state, props.messageId)
+  const currentCategory = readCurrentCategory(props.state, props.messageId)
+  const currentLabel = currentCategory?.name ?? "Categorize"
+  const currentPalette = currentCategory
+    ? createCategoryPalette(currentCategory.id)
+    : null
 
   async function handleCategoryChange(categoryId: string) {
     if (!categoryId) return
@@ -67,25 +87,78 @@ export function DiscordCategorizationControl(
   }
 
   function resetExpandedUi() {
+    clearCategoryControlDraft(props.messageId)
     setIsPickerOpen(false)
     setIsCreateFormOpen(false)
     setNewCategoryName("")
     setErrorMessage(null)
   }
 
+  function persistDraft(nextDraft: CategoryControlDraft): void {
+    writeCategoryControlDraft(props.messageId, nextDraft)
+  }
+
   return (
-    <div data-treem-role="category-control" className="treem-category-control">
-      <button
-        type="button"
+    <div
+      data-treem-role="category-control"
+      className="treem-category-control"
+      onBeforeInputCapture={stopEventPropagation}
+      onInputCapture={(event) => {
+        stopEventPropagation(event)
+
+        const inputTarget = event.target as
+          | {
+              tagName?: string
+              dataset?: { treemRole?: string }
+              value?: string
+            }
+          | null
+
+        if (
+          inputTarget?.tagName === "INPUT" &&
+          inputTarget.dataset?.treemRole === "category-create-input"
+        ) {
+          persistDraft({
+            isPickerOpen,
+            isCreateFormOpen,
+            newCategoryName: inputTarget.value ?? ""
+          })
+        }
+      }}
+      onKeyDownCapture={stopEventPropagation}
+      onKeyUpCapture={stopEventPropagation}
+    >
+      <BadgeButton
         data-treem-role="category-toggle"
+        data-treem-has-category={currentCategory ? "true" : "false"}
         className="treem-category-toggle"
+        variant="secondary"
+        style={
+          currentPalette
+            ? {
+                background: `linear-gradient(135deg, ${currentPalette.start}, ${currentPalette.end})`,
+                borderColor: currentPalette.end,
+                boxShadow: `0 0 0 1px ${currentPalette.accent} inset`,
+                color: "#ffffff"
+              }
+            : undefined
+        }
         onClick={() => {
           setErrorMessage(null)
-          setIsPickerOpen((currentValue) => !currentValue)
+          setIsPickerOpen((currentValue) => {
+            const nextValue = !currentValue
+            persistDraft({
+              isPickerOpen: nextValue,
+              isCreateFormOpen,
+              newCategoryName
+            })
+            props.onUiStateChange?.()
+            return nextValue
+          })
         }}
       >
         {currentLabel}
-      </button>
+      </BadgeButton>
       {isPickerOpen ? (
         <div
           data-treem-role="category-picker"
@@ -107,21 +180,34 @@ export function DiscordCategorizationControl(
             ))}
             <option value={UNCATEGORIZED_CATEGORY_ID}>Uncategorized</option>
           </select>
-          <button
-            type="button"
+          <BadgeButton
             data-treem-role="category-create-toggle"
             className="treem-category-create-toggle"
+            variant="secondary"
             onClick={() => {
               setErrorMessage(null)
-              setIsCreateFormOpen((currentValue) => !currentValue)
+              setIsCreateFormOpen((currentValue) => {
+                const nextValue = !currentValue
+                persistDraft({
+                  isPickerOpen,
+                  isCreateFormOpen: nextValue,
+                  newCategoryName
+                })
+                props.onUiStateChange?.()
+                return nextValue
+              })
             }}
           >
             New
-          </button>
+          </BadgeButton>
           {isCreateFormOpen ? (
-            <div
+            <form
               data-treem-role="category-create-form"
               className="treem-category-create-form"
+              onSubmit={async (event) => {
+                event.preventDefault()
+                await handleCreateCategory()
+              }}
             >
               <input
                 type="text"
@@ -131,21 +217,17 @@ export function DiscordCategorizationControl(
                 value={newCategoryName}
                 placeholder="New category"
                 onChange={(event) => {
-                  setNewCategoryName(event.currentTarget.value)
+                  const nextValue = event.currentTarget.value
+                  setNewCategoryName(nextValue)
+                  persistDraft({
+                    isPickerOpen,
+                    isCreateFormOpen,
+                    newCategoryName: nextValue
+                  })
                   if (errorMessage) setErrorMessage(null)
                 }}
               />
-              <button
-                type="button"
-                data-treem-role="category-create-submit"
-                className="treem-category-create-submit"
-                onClick={async () => {
-                  await handleCreateCategory()
-                }}
-              >
-                Save
-              </button>
-            </div>
+            </form>
           ) : null}
           {errorMessage ? (
             <p
@@ -161,17 +243,63 @@ export function DiscordCategorizationControl(
   )
 }
 
-function readCurrentCategoryLabel(
+function stopEventPropagation(event: {
+  stopPropagation: () => void
+}): void {
+  event.stopPropagation()
+}
+
+function readCategoryControlDraft(messageId: string): CategoryControlDraft {
+  return (
+    categoryControlDrafts.get(messageId) ?? {
+      isPickerOpen: false,
+      isCreateFormOpen: false,
+      newCategoryName: ""
+    }
+  )
+}
+
+function writeCategoryControlDraft(
+  messageId: string,
+  draft: CategoryControlDraft
+): void {
+  categoryControlDrafts.set(messageId, draft)
+}
+
+function clearCategoryControlDraft(messageId: string): void {
+  categoryControlDrafts.delete(messageId)
+}
+
+export function resetCategoryControlDraftsForTests(): void {
+  categoryControlDrafts.clear()
+}
+
+export function isCategoryControlPinnedOpen(messageId: string): boolean {
+  const draft = categoryControlDrafts.get(messageId)
+  return draft?.isPickerOpen === true || draft?.isCreateFormOpen === true
+}
+
+export function hasCategoryControlDraft(messageId: string): boolean {
+  const draft = categoryControlDrafts.get(messageId)
+  if (!draft) return false
+
+  return (
+    draft.isPickerOpen === true ||
+    draft.isCreateFormOpen === true ||
+    draft.newCategoryName.trim().length > 0
+  )
+}
+
+function readCurrentCategory(
   state: LeaderboardState,
   messageId: string
-): string {
+) {
   const assignment = state.messageCategoryAssignments.find(
     (candidate) => candidate.messageId === messageId
   )
-  if (!assignment) return "Categorize"
+  if (!assignment) return null
 
-  const category = state.categories.find(
+  return state.categories.find(
     (candidate) => candidate.id === assignment.categoryId
   )
-  return category ? `Category: ${category.name}` : "Categorize"
 }

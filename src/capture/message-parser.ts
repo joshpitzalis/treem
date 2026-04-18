@@ -51,6 +51,8 @@ export function extractVisibleMessages(
   } | null = null
 
   nodes.forEach((node) => {
+    if (!isMessageNodeInViewport(node)) return
+
     const parsed = parseMessageNode(node, community, previousAuthor)
     if (parsed) {
       messagesById.set(parsed.id, parsed)
@@ -66,6 +68,20 @@ export function extractVisibleMessages(
   })
 
   return Array.from(messagesById.values())
+}
+
+function isMessageNodeInViewport(node: HTMLElement): boolean {
+  const rect = node.getBoundingClientRect()
+  const hasNoMeasuredBox = rect.width === 0 && rect.height === 0
+
+  if (hasNoMeasuredBox) return true
+
+  return (
+    rect.bottom > 0 &&
+    rect.right > 0 &&
+    rect.top < window.innerHeight &&
+    rect.left < window.innerWidth
+  )
 }
 
 export function detectViewerProfile(): ViewerProfile | null {
@@ -177,13 +193,17 @@ function normalizeMessageId(value: string): string {
 function readAuthorName(node: HTMLElement): string | null {
   const selectors = [
     '[id^="message-username-"]',
+    '[class*="headerText"] [class*="username"]',
     'h3 span[class*="username"]',
-    'span[class*="username"]',
     'h3 span[role="button"]'
   ]
 
   for (const selector of selectors) {
     const element = node.querySelector<HTMLElement>(selector)
+    if (element?.closest('[class*="threadMessageAccessory"]')) continue
+    if (element?.closest('[class*="repliedMessage"]')) continue
+    if (element?.closest('[class*="repliedText"]')) continue
+
     const text = element?.textContent?.trim()
     if (text) return text
   }
@@ -197,12 +217,20 @@ function readTimestamp(node: HTMLElement): string | null {
 }
 
 function readAuthorAvatarUrl(node: HTMLElement): string | null {
-  const image = node.querySelector<HTMLImageElement>(
-    'img[class*="avatar"], [class*="avatar"] img, [data-list-item-id] img'
+  const images = node.querySelectorAll<HTMLImageElement>(
+    'img[class*="avatar"], [class*="avatar"] img'
   )
 
-  const src = image?.src?.trim()
-  return src || null
+  for (const image of images) {
+    if (image.closest('[class*="threadMessageAccessory"]')) continue
+    if (image.closest('[class*="repliedMessage"]')) continue
+    if (image.closest('[class*="repliedText"]')) continue
+
+    const src = image.src?.trim()
+    if (src) return src
+  }
+
+  return null
 }
 
 function readContentLength(node: HTMLElement): number {
@@ -246,9 +274,35 @@ function countAttachments(node: HTMLElement): number {
 
 export function looksLikeReplyMessageNode(node: HTMLElement): boolean {
   return (
+    isThreadPanelMessageNode(node) ||
     node.matches(REPLY_MARKER_SELECTOR) ||
     node.querySelector(REPLY_MARKER_SELECTOR) != null
   )
+}
+
+function isThreadPanelMessageNode(node: HTMLElement): boolean {
+  let current: HTMLElement | null = node
+
+  while (current) {
+    if (current.tagName === "ASIDE") return true
+
+    const role = current.getAttribute("role")?.trim().toLowerCase()
+    if (role === "complementary") return true
+
+    const className =
+      typeof current.className === "string" ? current.className : ""
+    if (
+      /threadSidebar(?!Open)/.test(className) ||
+      className.includes("threadView") ||
+      className.includes("threadChat")
+    ) {
+      return true
+    }
+
+    current = current.parentElement
+  }
+
+  return false
 }
 
 function readGuildName(guildId: string): string {

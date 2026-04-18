@@ -81,9 +81,7 @@ describe("popup React app", () => {
     ).toBeNull()
     expect(within(page.getByTestId("treemap")).getByText(/Bug/)).toBeTruthy()
     expect(within(page.getByTestId("treemap")).getByText(/100%/)).toBeTruthy()
-    expect(
-      window.document.querySelector("#sync-status")?.textContent ?? ""
-    ).toBe("")
+    expect(window.document.querySelector("#sync-status")).toBeNull()
     expect(
       window.document.querySelector("#status")?.textContent ?? ""
     ).not.toMatch(/Processing/)
@@ -161,6 +159,100 @@ describe("popup React app", () => {
     )
     expect(readTreemapTileArea(window.document, "cat-bug")).toBeGreaterThan(
       readTreemapTileArea(window.document, "uncategorized")
+    )
+  })
+
+  it("applies treemap tile classes so category tiles render with treemap styling", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    const bugTile = window.document.querySelector<HTMLElement>(
+      '[data-tile-id="cat-bug"]'
+    )
+
+    expect(bugTile?.className).toContain("treemap-tile")
+    expect(bugTile?.className).toContain("is-large")
+  })
+
+  it("excludes reply messages from popup treemap composition", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => ({
+        ...createState(),
+        messages: [
+          ...createState().messages,
+          {
+            ...createMessage({
+              id: "reply-1",
+              guildId: "guild-1",
+              guildName: "Guild One",
+              channelId: "channel-1",
+              channelName: "alpha",
+              authorKey: "reply-author",
+              authorName: "Reply Author",
+              messageTimestamp: "2026-04-17T08:00:00.000Z"
+            }),
+            isReply: true
+          }
+        ],
+        messageCategoryAssignments: [
+          ...createState().messageCategoryAssignments,
+          {
+            messageId: "reply-1",
+            guildId: "guild-1",
+            categoryId: "cat-feature",
+            assignedAt: "2026-04-17T08:05:00.000Z"
+          }
+        ]
+      }),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    const treemapText =
+      within(window.document.body).getByTestId("treemap").textContent ?? ""
+
+    expect(treemapText).toMatch(/Feature[\s\S]*1 messages/)
+    expect(treemapText).not.toMatch(/Feature[\s\S]*2 messages/)
+    expect(treemapText).not.toMatch(/20% of slice/)
+  })
+
+  it("applies distinct palette variables across treemap tiles", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    const bugTile = window.document.querySelector<HTMLElement>(
+      '[data-tile-id="cat-bug"]'
+    )
+    const featureTile = window.document.querySelector<HTMLElement>(
+      '[data-tile-id="cat-feature"]'
+    )
+
+    expect(bugTile?.getAttribute("style") ?? "").toContain(
+      "--treemap-fill-start"
+    )
+    expect(featureTile?.getAttribute("style") ?? "").toContain(
+      "--treemap-fill-start"
+    )
+    expect(bugTile?.getAttribute("style")).not.toBe(
+      featureTile?.getAttribute("style")
     )
   })
 
@@ -290,29 +382,17 @@ describe("popup React app", () => {
       expect(page.getByTestId("treemap").textContent ?? "").toMatch(/Docs/)
     })
     expect(page.getByTestId("treemap").textContent ?? "").not.toMatch(/Feature/)
-    expect(
-      window.document.querySelector("#sync-status")?.textContent ?? ""
-    ).toBe("")
+    expect(window.document.querySelector("#sync-status")).toBeNull()
   })
 
-  it("shows updating and updated sync status during storage refresh", async () => {
+  it("refreshes popup state without rendering a sync status line", async () => {
     const { window } = createPopupDom()
-    const originalSetTimeout = window.setTimeout.bind(window)
     let storageListener = (
       _changes: Record<string, unknown>,
       _areaName: string
     ) => {}
-    const scheduledTimeouts: Array<() => void> = []
     let loadStateCallCount = 0
     let resolveBlockedLoadState = (_state: LeaderboardState) => {}
-
-    window.setTimeout = ((handler: TimerHandler) => {
-      if (typeof handler === "function") {
-        scheduledTimeouts.push(handler as () => void)
-      }
-
-      return 0
-    }) as typeof window.setTimeout
 
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
@@ -337,37 +417,19 @@ describe("popup React app", () => {
     storageListener({ discordLeaderboardState: {} }, "local")
 
     await waitFor(() => {
+      expect(window.document.querySelector("#sync-status")).toBeNull()
       expect(
-        window.document.querySelector("#sync-status")?.textContent ?? ""
-      ).toBe("Updating...")
-      expect(window.document.querySelector("#status")?.textContent ?? "").toBe(
-        ""
-      )
+        window.document.querySelector("#status")?.textContent ?? ""
+      ).not.toBe("")
     })
 
     resolveBlockedLoadState(createState())
-    await waitFor(() => {
-      expect(scheduledTimeouts.length).toBeGreaterThan(0)
-    })
-    scheduledTimeouts.shift()?.()
-    await new Promise((resolve) => originalSetTimeout(resolve, 0))
 
     await waitFor(() => {
+      expect(window.document.querySelector("#sync-status")).toBeNull()
       expect(
-        window.document.querySelector("#sync-status")?.textContent ?? ""
-      ).toBe("Updated")
-    })
-
-    await waitFor(() => {
-      expect(scheduledTimeouts.length).toBeGreaterThan(0)
-    })
-    scheduledTimeouts.shift()?.()
-    await new Promise((resolve) => originalSetTimeout(resolve, 0))
-
-    await waitFor(() => {
-      expect(
-        window.document.querySelector("#sync-status")?.textContent ?? ""
-      ).toBe("")
+        window.document.querySelector("#status")?.textContent ?? ""
+      ).not.toBe("")
     })
   })
 })

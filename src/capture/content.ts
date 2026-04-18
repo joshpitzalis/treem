@@ -16,6 +16,11 @@ import {
 let captureQueued = false
 let observerStarted = false
 
+console.info("[treem] capture loaded", {
+  version: __TREEM_EXTENSION_VERSION__,
+  build: __TREEM_BUILD_STAMP__
+})
+
 function queueCapture(): void {
   if (captureQueued) return
 

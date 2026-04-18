@@ -3,7 +3,10 @@ import { createRoot, type Root } from "react-dom/client"
 import type { LeaderboardState } from "../shared/types"
 import { looksLikeReplyMessageNode } from "./message-parser"
 import categoryControlStyles from "./discord-categorization-control.css?inline"
-import { DiscordCategorizationControl } from "./discord-categorization-control"
+import {
+  DiscordCategorizationControl,
+  hasCategoryControlDraft
+} from "./discord-categorization-control"
 
 const MESSAGE_SELECTOR = [
   'li[id^="chat-messages-"]',
@@ -21,8 +24,9 @@ interface CategorizationRuntime {
 }
 
 interface MessageRenderContext {
-  headerNode: HTMLElement
+  anchorNode: HTMLElement
   host: HTMLElement
+  layout: "header"
   messageKey: string
   runtime: CategorizationRuntime
 }
@@ -82,8 +86,9 @@ function syncMessageControl(input: {
   }
 
   renderMessageControl({
-    headerNode: messageContext.headerNode,
+    anchorNode: messageContext.anchorNode,
     host: messageContext.host,
+    layout: messageContext.layout,
     messageKey: messageContext.messageKey,
     runtime: input.runtime,
     state: input.state
@@ -97,49 +102,75 @@ function resolveMessageRenderContext(
   const messageId = extractMessageId(messageNode)
   if (!messageId) return null
 
-  const headerNode =
-    messageNode.querySelector<HTMLElement>("time")?.parentElement ?? messageNode
-  headerNode.classList.add("treem-category-anchor")
+  messageNode.classList.add("treem-category-row")
 
-  const host = ensureHostElement(headerNode)
   const messageKey = `${runtime.guildId}:${readChannelId(runtime.document.location?.pathname)}:${messageId}`
+  const anchor = resolveAnchorNode(messageNode)
+  ensureAnchorPositioning(anchor.anchorNode, anchor.layout)
+
+  const host = ensureHostElement(messageNode, anchor.anchorNode, anchor.layout)
 
   host.dataset.treemGuildId = runtime.guildId
+  host.dataset.treemLayout = anchor.layout
   host.dataset.treemMessageId = messageKey
 
   return {
-    headerNode,
+    anchorNode: anchor.anchorNode,
     host,
+    layout: anchor.layout,
     messageKey,
     runtime
   }
 }
 
-function ensureHostElement(headerNode: HTMLElement): HTMLElement {
-  const existingHost = headerNode.querySelector<HTMLElement>(
+function ensureHostElement(
+  messageNode: HTMLElement,
+  anchorNode: HTMLElement,
+  layout: "header"
+): HTMLElement {
+  const existingHost = messageNode.querySelector<HTMLElement>(
     '[data-treem-role="category-control-host"]'
   )
-  if (existingHost) return existingHost
+  if (existingHost) {
+    existingHost.dataset.treemLayout = layout
+    if (existingHost.parentElement !== anchorNode) {
+      anchorNode.append(existingHost)
+    }
+    return existingHost
+  }
 
-  const host = headerNode.ownerDocument.createElement("div")
+  const host = anchorNode.ownerDocument.createElement("div")
   host.dataset.treemRole = "category-control-host"
-  headerNode.append(host)
+  host.dataset.treemLayout = layout
+  host.hidden = false
+  anchorNode.append(host)
 
   return host
 }
 
 function renderMessageControl(input: {
-  headerNode: HTMLElement
+  anchorNode: HTMLElement
   host: HTMLElement
+  layout: "header"
   messageKey: string
   runtime: CategorizationRuntime
   state: LeaderboardState
 }): void {
-  input.headerNode.classList.add("treem-category-anchor")
+  ensureCategoryControlStyles(input.host.ownerDocument)
+  const existingRoot = hostRoots.get(input.host)
+
+  if (
+    existingRoot &&
+    hasCategoryControlDraft(input.messageKey) &&
+    input.host.querySelector('[data-treem-role="category-control"]')
+  ) {
+    input.host.hidden = false
+    return
+  }
 
   const root = getOrCreateRoot(input.host)
-  const shadowRoot = input.host.shadowRoot
-  if (!shadowRoot) return
+
+  input.host.hidden = false
 
   flushSync(() => {
     root.render(
@@ -147,6 +178,9 @@ function renderMessageControl(input: {
         guildId={input.runtime.guildId}
         messageId={input.messageKey}
         state={input.state}
+        onUiStateChange={() => {
+          renderAllMessageControls(input.runtime, input.state)
+        }}
         onStateChange={async (nextState) => {
           await input.runtime.saveState(nextState)
           renderAllMessageControls(input.runtime, nextState)
@@ -160,17 +194,15 @@ function getOrCreateRoot(host: HTMLElement): Root {
   const existingRoot = hostRoots.get(host)
   if (existingRoot) return existingRoot
 
-  const shadowRoot = host.shadowRoot ?? host.attachShadow({ mode: "open" })
-  shadowRoot.innerHTML = `
-    <style>
-      ${categoryControlStyles}
-    </style>
-    <div data-treem-role="category-root"></div>
-  `
-
-  const container = shadowRoot.querySelector<HTMLElement>(
+  const container = host.querySelector<HTMLElement>(
     '[data-treem-role="category-root"]'
-  )
+  ) ?? host.ownerDocument.createElement("div")
+
+  if (!container.dataset.treemRole) {
+    container.dataset.treemRole = "category-root"
+    host.replaceChildren(container)
+  }
+
   if (!container) {
     throw new Error("Category control root missing")
   }
@@ -180,10 +212,60 @@ function getOrCreateRoot(host: HTMLElement): Root {
   return root
 }
 
+function ensureCategoryControlStyles(document: Document): void {
+  if (document.getElementById("treem-category-control-styles")) return
+
+  const style = document.createElement("style")
+  style.id = "treem-category-control-styles"
+  style.textContent = categoryControlStyles.split(":host").join(
+    '[data-treem-role="category-control-host"]'
+  )
+  document.head.append(style)
+}
+
 function unmountMessageControl(host: HTMLElement): void {
   hostRoots.get(host)?.unmount()
   hostRoots.delete(host)
   host.remove()
+}
+
+function resolveAnchorNode(
+  messageNode: HTMLElement
+): {
+  anchorNode: HTMLElement
+  layout: "header"
+} {
+  const headerNode = resolveHeaderNode(messageNode)
+  return {
+    anchorNode: headerNode,
+    layout: "header"
+  }
+}
+
+function resolveHeaderNode(messageNode: HTMLElement): HTMLElement {
+  const timeNode = messageNode.querySelector<HTMLElement>("time")
+  if (!timeNode) return messageNode
+
+  return (
+    timeNode.closest<HTMLElement>('h3, [class*="header"], [role="heading"]') ??
+    timeNode.parentElement ??
+    messageNode
+  )
+}
+
+function ensureAnchorPositioning(
+  anchorNode: HTMLElement,
+  layout: "header"
+): void {
+  anchorNode.classList.add("treem-category-anchor")
+
+  if (!anchorNode.style.position) {
+    anchorNode.style.position = "relative"
+  }
+
+  if (!anchorNode.style.display) {
+    anchorNode.style.display = "inline-block"
+  }
 }
 
 function extractMessageId(node: HTMLElement): string | null {

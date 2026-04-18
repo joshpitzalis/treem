@@ -143,10 +143,6 @@
     @apply mt-2.5 mb-0 text-[13px] leading-[1.4] text-treem-muted;
   }
 
-  .sync-status {
-    @apply mt-2.5 mb-0 text-xs font-bold tracking-[0.02em] text-treem-accent-strong;
-  }
-
   .leaderboard-header,
   .treemap-header {
     @apply px-1 pt-1 pb-2.5;
@@ -265,11 +261,23 @@
   }
 
   .treemap-chart {
-    @apply relative aspect-square overflow-hidden rounded-xl bg-[rgba(255,255,255,0.65)];
+    @apply relative aspect-square overflow-hidden rounded-xl bg-[rgba(255,251,246,0.78)];
   }
 
   .treemap-tile {
-    @apply absolute flex flex-col justify-end overflow-hidden rounded-xl border border-white/60 bg-linear-to-br from-[#d56f3e] to-[#edb562] p-2.5 text-white shadow-[0_10px_24px_rgba(84,45,17,0.18)];
+    @apply absolute flex flex-col justify-end overflow-hidden rounded-xl border p-2.5 text-white;
+    background-color: var(--treemap-fill-end);
+    background-image: linear-gradient(
+      135deg,
+      var(--treemap-fill-start),
+      var(--treemap-fill-end)
+    );
+    border-color: rgba(255, 255, 255, 0.52);
+    box-shadow:
+      0 10px 24px rgba(84, 45, 17, 0.14),
+      inset 0 0 0 1px var(--treemap-fill-accent);
+    outline: 2px solid var(--treemap-separator);
+    outline-offset: -1px;
   }
 
   .treemap-tile.is-medium {

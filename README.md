@@ -36,6 +36,10 @@ The MVP contribution score is intentionally simple:
 5. Click `Load unpacked`
 6. Select the repo's `extension` folder: `/Users/jxsh/Desktop/projects/treem/extension`
 
+## Agent workflow
+
+Agent-facing repo workflow notes live in `AGENTS.md`.
+
 ## Project structure
 
 - `src/shared`: common types, storage, and scoring

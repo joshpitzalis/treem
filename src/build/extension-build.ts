@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir } from "node:fs/promises"
+import { cp, mkdir, readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import tailwindcss from "@tailwindcss/vite"
@@ -40,6 +40,7 @@ export async function buildExtension(
 ): Promise<void> {
   const outDir = options.outDir ?? extensionSourceDir
   const watch = options.watch ?? false
+  const buildInfo = await readBuildInfo()
 
   await copyStaticExtensionFiles({
     sourceDir: extensionSourceDir,
@@ -47,11 +48,12 @@ export async function buildExtension(
   })
 
   for (const target of buildTargets) {
-    await build(createTargetConfig({ outDir, watch, ...target }))
+    await build(createTargetConfig({ buildInfo, outDir, watch, ...target }))
   }
 }
 
 function createTargetConfig({
+  buildInfo,
   bundleName,
   cssFileName,
   entryPath,
@@ -59,6 +61,10 @@ function createTargetConfig({
   outputPath,
   watch
 }: {
+  buildInfo: {
+    extensionVersion: string
+    buildStamp: string
+  }
   bundleName: string
   cssFileName?: string
   entryPath: string
@@ -70,7 +76,9 @@ function createTargetConfig({
     configFile: false,
     publicDir: false,
     define: {
-      "process.env.NODE_ENV": JSON.stringify("production")
+      "process.env.NODE_ENV": JSON.stringify("production"),
+      __TREEM_EXTENSION_VERSION__: JSON.stringify(buildInfo.extensionVersion),
+      __TREEM_BUILD_STAMP__: JSON.stringify(buildInfo.buildStamp)
     },
     build: {
       emptyOutDir: false,
@@ -93,6 +101,24 @@ function createTargetConfig({
     },
     logLevel: "info",
     plugins: [tailwindcss()]
+  }
+}
+
+async function readBuildInfo(): Promise<{
+  extensionVersion: string
+  buildStamp: string
+}> {
+  const packageJson = JSON.parse(
+    await readFile(path.join(projectRoot, "package.json"), "utf8")
+  ) as {
+    version?: string
+  }
+  const extensionVersion = packageJson.version ?? "0.0.0"
+  const buildStamp = `${extensionVersion}+${new Date().toISOString()}`
+
+  return {
+    extensionVersion,
+    buildStamp
   }
 }
 

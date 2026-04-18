@@ -17,6 +17,9 @@ declare const chrome: {
   }
 }
 
+declare const __TREEM_EXTENSION_VERSION__: string
+declare const __TREEM_BUILD_STAMP__: string
+
 declare module "*.css" {
   const css: string
   export default css
