@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@source "./discord-categorization-control.tsx";
+@source "../components/categorization-control.tsx";
 
 @layer base {
   :host {

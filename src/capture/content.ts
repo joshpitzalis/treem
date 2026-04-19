@@ -5,7 +5,7 @@ import {
   saveState,
   saveViewerProfile
 } from "../shared/storage"
-import { resolveCaptureSource } from "./resolve-capture-source"
+import { resolveCaptureSource } from "./sources"
 
 let captureQueued = false
 let observerStarted = false

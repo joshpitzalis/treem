@@ -1,11 +1,11 @@
-import type { CaptureSource } from "./capture-source"
-import { enhanceCategorizationControls } from "./categorization"
+import type { CaptureSource } from "../../types"
+import { enhanceCategorizationControls } from "./components/categorization"
 import {
   detectCurrentCommunity,
   detectLiveEdge,
   detectViewerProfile,
   extractVisibleMessages
-} from "./message-parser"
+} from "./helpers/message-parser"
 
 export const discordCaptureSource: CaptureSource = {
   supportsLocation: (location) =>

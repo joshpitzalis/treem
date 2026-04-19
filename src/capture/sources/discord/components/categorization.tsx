@@ -1,13 +1,13 @@
 import { flushSync } from "react-dom"
 import { createRoot, type Root } from "react-dom/client"
-import type { LeaderboardState } from "../shared/types"
-import type { CaptureCategorizationRuntime } from "./capture-source"
-import { looksLikeReplyMessageNode } from "./message-parser"
-import categoryControlStyles from "./discord-categorization-control.css?inline"
+import type { LeaderboardState } from "../../../../shared/types"
+import type { CaptureCategorizationRuntime } from "../../../types"
+import { looksLikeReplyMessageNode } from "../helpers/message-parser"
+import categoryControlStyles from "../lib/styles.css?inline"
 import {
   DiscordCategorizationControl,
   hasCategoryControlDraft
-} from "./discord-categorization-control"
+} from "./categorization-control"
 
 const MESSAGE_SELECTOR = [
   'li[id^="chat-messages-"]',

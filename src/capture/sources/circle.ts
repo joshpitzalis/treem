@@ -1,4 +1,4 @@
-import type { CaptureSource } from "./capture-source"
+import type { CaptureSource } from "../types"
 
 export const circleCaptureSource: CaptureSource = {
   supportsLocation: (location) =>

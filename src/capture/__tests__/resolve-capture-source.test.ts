@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { circleCaptureSource } from "../circle-capture-source"
-import { discordCaptureSource } from "../discord-capture-source"
-import { resolveCaptureSource } from "../resolve-capture-source"
+import { resolveCaptureSource } from "../sources"
+import { circleCaptureSource } from "../sources/circle"
+import { discordCaptureSource } from "../sources/discord"
 
 describe("resolveCaptureSource", () => {
   it("returns the discord capture source for discord hosts", () => {

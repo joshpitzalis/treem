@@ -1,7 +1,7 @@
 import { JSDOM } from "jsdom"
 import { beforeEach, describe, expect, it } from "vitest"
 
-import { extractVisibleMessages } from "../message-parser"
+import { extractVisibleMessages } from "../helpers/message-parser"
 
 describe("extractVisibleMessages", () => {
   beforeEach(() => {

@@ -1,6 +1,6 @@
-import type { CaptureSource, CaptureSourceLocation } from "./capture-source"
-import { circleCaptureSource } from "./circle-capture-source"
-import { discordCaptureSource } from "./discord-capture-source"
+import type { CaptureSource, CaptureSourceLocation } from "../types"
+import { circleCaptureSource } from "./circle"
+import { discordCaptureSource } from "./discord"
 
 const captureSources: CaptureSource[] = [
   discordCaptureSource,
