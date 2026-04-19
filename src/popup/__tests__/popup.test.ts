@@ -3,6 +3,7 @@ import { JSDOM } from "jsdom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { LeaderboardState } from "../../shared/types"
+import { ALL_CHANNELS_VALUE } from "../lib/constants"
 import {
   resolveInitialSelection,
   resolvePreservedSelection
@@ -93,6 +94,77 @@ describe("popup React app", () => {
       window.document.querySelector("#status")?.textContent ?? ""
     ).not.toMatch(/Processing/)
     expect(savedSelections).toHaveLength(2)
+  })
+
+  it("reinitializes popup state when bootstrapped again on the same document", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadInitialPopupModel: async () => createPopupModel(createState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
+    })
+
+    let page = within(window.document.body)
+    expect(page.getByDisplayValue("Guild One")).toBeTruthy()
+
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadInitialPopupModel: async () =>
+        createPopupModel(createGuildTwoOnlyState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createGuildTwoOnlyState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
+    })
+
+    page = within(window.document.body)
+    expect(page.getByDisplayValue("Guild Two")).toBeTruthy()
+    expect(page.queryByText(/Guild One/)).toBeNull()
+    expect(page.getByText(/Drew/)).toBeTruthy()
+  })
+
+  it("persists server selection changes and resets invalid channel scope", async () => {
+    const { window } = createPopupDom()
+    const savedSelections: PopupSelection[] = []
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadInitialPopupModel: async () => createPopupModel(createState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createState(), previousSelection),
+      saveSelection: async (selection) => {
+        savedSelections.push(selection)
+      },
+      subscribeToLeaderboardStateChanges: () => () => {}
+    })
+
+    const page = within(window.document.body)
+
+    fireEvent.change(page.getByLabelText("Channel"), {
+      target: { value: "channel-1" }
+    })
+    fireEvent.change(page.getByLabelText("Server"), {
+      target: { value: "guild-2" }
+    })
+
+    expect(page.getByDisplayValue("Guild Two")).toBeTruthy()
+    expect(
+      within(page.getByTestId("leaderboard")).getByText(/Guild Two/)
+    ).toBeTruthy()
+
+    await waitFor(() => {
+      expect(savedSelections).toContainEqual({
+        guildId: "guild-2",
+        channelId: ALL_CHANNELS_VALUE,
+        timeRange: "30d"
+      })
+    })
   })
 
   it("renders mixed named categories plus uncategorized and omits empty categories per time slice", async () => {
@@ -755,6 +827,29 @@ function createMixedCompositionState(): LeaderboardState {
         assignedAt: "2026-04-13T10:05:00.000Z"
       }
     ],
+    updatedAt: "2026-04-16T12:00:00.000Z"
+  }
+}
+
+function createGuildTwoOnlyState(): LeaderboardState {
+  return {
+    messages: [
+      createMessage({
+        id: "guild-two-1",
+        guildId: "guild-2",
+        guildName: "Guild Two",
+        channelId: "channel-3",
+        channelName: "gamma",
+        authorKey: "drew",
+        authorName: "Drew",
+        messageTimestamp: "2026-04-16T09:00:00.000Z"
+      })
+    ],
+    viewerProfile: null,
+    scopeObservations: [],
+    popupPreferences: null,
+    categories: [],
+    messageCategoryAssignments: [],
     updatedAt: "2026-04-16T12:00:00.000Z"
   }
 }

@@ -19,10 +19,6 @@ export interface PopupRuntime {
   subscribeToLeaderboardStateChanges: (listener: () => void) => () => void
 }
 
-export interface RefreshRequest {
-  showLoading: boolean
-}
-
 export interface TreemapRect {
   top: number
   left: number

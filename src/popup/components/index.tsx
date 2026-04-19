@@ -30,7 +30,7 @@ export function ReadinessChip(input: { state: DataReadiness }) {
 }
 
 export function LeaderboardSection(input: {
-  onTimeRangeChange: (timeRange: TimeRangeKey) => Promise<void>
+  onTimeRangeChange: (timeRange: TimeRangeKey) => void
   scopeLabel: string
   selectedTimeRange: TimeRangeKey
   summary: LeaderboardSummary
@@ -56,7 +56,7 @@ export function LeaderboardSection(input: {
               data-range={timeRange}
               type="button"
               onClick={() => {
-                void input.onTimeRangeChange(timeRange)
+                input.onTimeRangeChange(timeRange)
               }}
             >
               {timeRange}

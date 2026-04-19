@@ -1,17 +1,17 @@
-
+import { Effect } from "effect"
 import { flushSync } from "react-dom"
 import { createRoot, type Root } from "react-dom/client"
 import "./lib/styles.css"
-import type { PopupRuntime,  } from "./types"
+import { PopupApp } from "./App"
 import { AtomRegistryProvider } from "./lib/atom-registry-provider"
 import {
-runPopupStateEffect,
   ensurePopupMountNode,
-runPopupStateSyncEffect
+  runPopupStateEffect,
+  runPopupStateSyncEffect
 } from "./lib/helpers"
-import { Effect } from "effect"
 import { PopupStateService } from "./services/popup-state-service"
-import { PopupApp } from "./App"
+import type { PopupRuntime } from "./types"
+
 export let popupRuntime: PopupRuntime = createBrowserRuntime()
 export let popupRoot: Root | null = null
 export let popupMountNode: HTMLElement | null = null
@@ -27,8 +27,6 @@ export async function bootstrapPopup(
 
   const mountNode = ensurePopupMountNode(popupRuntime.document)
   const initialModel = await popupRuntime.loadInitialPopupModel()
-  const initialState = initialModel.state
-  const initialSelection = initialModel.selection
 
   if (!popupRoot || popupMountNode !== mountNode) {
     popupRoot = createRoot(mountNode)
@@ -39,12 +37,11 @@ export async function bootstrapPopup(
 
   flushSync(() => {
     popupRoot?.render(
-      <AtomRegistryProvider>
-      <PopupApp
-        key={renderKey}
-        runtime={popupRuntime}
-        initialState={initialState}
-        initialSelection={initialSelection}
+      <AtomRegistryProvider key={renderKey}>
+        <PopupApp
+          runtime={popupRuntime}
+          initialState={initialModel.state}
+          initialSelection={initialModel.selection}
         />
       </AtomRegistryProvider>
     )
