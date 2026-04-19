@@ -10,7 +10,6 @@ import {
   summarizeLeaderboard,
   summarizeTreemap
 } from "../shared/leaderboard-query"
-import { loadState, savePopupPreferences } from "../shared/storage"
 import type {
   TimeRangeKey
 } from "../shared/types"
@@ -394,7 +393,13 @@ function createBrowserRuntime(): PopupRuntime {
           return yield* storage.loadState()
         })
       ),
-    savePopupPreferences,
+    savePopupPreferences: (preferences) =>
+      runPopupEffect(
+        Effect.gen(function* () {
+          const storage = yield* LeaderboardStorage
+          return yield* storage.savePopupPreferences(preferences)
+        })
+      ),
     subscribeToLeaderboardStateChanges: (listener) => {
       const handleChange = (
         changes: Record<string, unknown>,

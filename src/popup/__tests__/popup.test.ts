@@ -31,7 +31,7 @@ describe("popup React app", () => {
       savePopupPreferences: async (preferences) => {
         savedPreferences.push(preferences)
       },
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const page = within(window.document.body)
@@ -96,7 +96,7 @@ describe("popup React app", () => {
       document: window.document,
       loadState: async () => createMixedCompositionState(),
       savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const page = within(window.document.body)
@@ -146,7 +146,7 @@ describe("popup React app", () => {
       document: window.document,
       loadState: async () => createState(),
       savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     expect(readTreemapTileArea(window.document, "cat-bug")).toBeCloseTo(5000, 0)
@@ -170,7 +170,7 @@ describe("popup React app", () => {
       document: window.document,
       loadState: async () => createState(),
       savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const bugTile = window.document.querySelector<HTMLElement>(
@@ -216,7 +216,7 @@ describe("popup React app", () => {
         ]
       }),
       savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const treemapText =
@@ -235,7 +235,7 @@ describe("popup React app", () => {
       document: window.document,
       loadState: async () => createState(),
       savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const bugTile = window.document.querySelector<HTMLElement>(
@@ -264,7 +264,7 @@ describe("popup React app", () => {
       document: window.document,
       loadState: async () => createEmptyState(),
       savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     let page = within(window.document.body)
@@ -285,7 +285,7 @@ describe("popup React app", () => {
       document: window.document,
       loadState: async () => createPastOnlyState(),
       savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     page = within(window.document.body)
@@ -303,10 +303,7 @@ describe("popup React app", () => {
     const { window } = createPopupDom()
     const originalSetTimeout = window.setTimeout.bind(window)
     let storageListenerRegistered = false
-    let storageListener = (
-      _changes: Record<string, unknown>,
-      _areaName: string
-    ) => {}
+    let stateChangeListener = () => {}
     let state = createState()
     let loadStateCallCount = 0
     let blockedLoadResolverRegistered = false
@@ -336,9 +333,10 @@ describe("popup React app", () => {
         return state
       },
       savePopupPreferences: async () => {},
-      addStorageChangeListener: (listener) => {
+      subscribeToLeaderboardStateChanges: (listener) => {
         storageListenerRegistered = true
-        storageListener = listener
+        stateChangeListener = listener
+        return () => {}
       }
     })
 
@@ -346,7 +344,7 @@ describe("popup React app", () => {
 
     expect(storageListenerRegistered).toBe(true)
 
-    storageListener({ discordLeaderboardState: {} }, "local")
+    stateChangeListener()
 
     state = {
       ...state,
@@ -373,7 +371,7 @@ describe("popup React app", () => {
       updatedAt: "2026-04-16T12:31:00.000Z"
     }
 
-    storageListener({ discordLeaderboardState: {} }, "local")
+    stateChangeListener()
     expect(blockedLoadResolverRegistered).toBe(true)
     resolveBlockedLoad(createState())
     await new Promise((resolve) => originalSetTimeout(resolve, 0))
@@ -387,10 +385,7 @@ describe("popup React app", () => {
 
   it("refreshes popup state without rendering a sync status line", async () => {
     const { window } = createPopupDom()
-    let storageListener = (
-      _changes: Record<string, unknown>,
-      _areaName: string
-    ) => {}
+    let stateChangeListener = () => {}
     let loadStateCallCount = 0
     let resolveBlockedLoadState = (_state: LeaderboardState) => {}
 
@@ -409,12 +404,13 @@ describe("popup React app", () => {
         })
       },
       savePopupPreferences: async () => {},
-      addStorageChangeListener: (listener) => {
-        storageListener = listener
+      subscribeToLeaderboardStateChanges: (listener) => {
+        stateChangeListener = listener
+        return () => {}
       }
     })
 
-    storageListener({ discordLeaderboardState: {} }, "local")
+    stateChangeListener()
 
     await waitFor(() => {
       expect(window.document.querySelector("#sync-status")).toBeNull()
