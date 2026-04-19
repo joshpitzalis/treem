@@ -1,7 +1,11 @@
 import type { CaptureSource, CaptureSourceLocation } from "./capture-source"
+import { circleCaptureSource } from "./circle-capture-source"
 import { discordCaptureSource } from "./discord-capture-source"
 
-const captureSources: CaptureSource[] = [discordCaptureSource]
+const captureSources: CaptureSource[] = [
+  discordCaptureSource,
+  circleCaptureSource
+]
 
 export function resolveCaptureSource(
   location: CaptureSourceLocation
