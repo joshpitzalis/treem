@@ -11,13 +11,12 @@ import {
   summarizeTreemap
 } from "../shared/leaderboard-query"
 import type {
+  LeaderboardState,
   TimeRangeKey
 } from "../shared/types"
-import {
-  leaderboardStateSchema
-} from "../shared/types"
+import { ALL_CHANNELS_VALUE } from "./constants"
 import type { PopupRuntime, PopupSelection, RefreshRequest } from "./types"
-import { AtomRegistryProvider } from "./lib/atom-registry-provider";
+import { AtomRegistryProvider } from "./lib/atom-registry-provider"
 import { ReadinessChip, LeaderboardSection, TreemapSection } from "./components"
 import {
   createEmptyReadinessStates,
@@ -30,11 +29,8 @@ import {
   resolveScopeLabel
 } from "./helpers"
 import { Effect } from "effect"
+import { PopupStateService } from "./services/popup-state-service"
 import { LeaderboardStorage } from "./services/storage-service"
-
-export type LeaderboardState = typeof leaderboardStateSchema.Type
-
-export const ALL_CHANNELS_VALUE = "__all__"
 
 export let popupRuntime: PopupRuntime = createBrowserRuntime()
 export let popupRoot: Root | null = null
@@ -50,8 +46,9 @@ export async function bootstrapPopup(
   }
 
   const mountNode = ensurePopupMountNode(popupRuntime.document)
-  const initialState = await popupRuntime.loadState()
-  const initialSelection = resolveInitialSelection(initialState)
+  const initialModel = await popupRuntime.loadInitialPopupModel()
+  const initialState = initialModel.state
+  const initialSelection = initialModel.selection
 
   if (!popupRoot || popupMountNode !== mountNode) {
     popupRoot = createRoot(mountNode)
@@ -381,6 +378,17 @@ function runPopupEffect<A>(
   )
 }
 
+function runPopupStateEffect<A>(
+  effect: Effect.Effect<A, never, PopupStateService | LeaderboardStorage>
+): Promise<A> {
+  return Effect.runPromise(
+    effect.pipe(
+      Effect.provide(PopupStateService.layer),
+      Effect.provide(LeaderboardStorage.layer)
+    )
+  )
+}
+
 function runPopupSyncEffect<A>(
   effect: Effect.Effect<A, never, LeaderboardStorage>
 ): A {
@@ -390,6 +398,13 @@ function runPopupSyncEffect<A>(
 function createBrowserRuntime(): PopupRuntime {
   return {
     document,
+    loadInitialPopupModel: () =>
+      runPopupStateEffect(
+        Effect.gen(function* () {
+          const popupState = yield* PopupStateService
+          return yield* popupState.loadInitialPopupModel()
+        })
+      ),
     loadState: () =>
       runPopupEffect(
         Effect.gen(function* () {

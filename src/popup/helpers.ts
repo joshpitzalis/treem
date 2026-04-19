@@ -9,11 +9,11 @@ import type {
   ChannelOption,
   DataReadiness,
   GuildOption,
+  LeaderboardState,
   TimeRangeKey,
   TreemapSummary
 } from "../shared/types"
-import type { LeaderboardState } from "."
-import { ALL_CHANNELS_VALUE } from "."
+import { ALL_CHANNELS_VALUE } from "./constants"
 import type {
   PopupSelection,
   RefreshRequest,

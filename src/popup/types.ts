@@ -4,17 +4,23 @@ import type {
   TimeRangeKey
 } from "../shared/types"
 
-export interface PopupRuntime {
-  document: Document
-  loadState: () => Promise<LeaderboardState>
-  savePopupPreferences: (preferences: PopupPreferences) => Promise<void>
-  subscribeToLeaderboardStateChanges: (listener: () => void) => () => void
-}
-
 export interface PopupSelection {
   guildId: string | null
   channelId: string
   timeRange: TimeRangeKey
+}
+
+export interface InitialPopupModel {
+  state: LeaderboardState
+  selection: PopupSelection
+}
+
+export interface PopupRuntime {
+  document: Document
+  loadInitialPopupModel: () => Promise<InitialPopupModel>
+  loadState: () => Promise<LeaderboardState>
+  savePopupPreferences: (preferences: PopupPreferences) => Promise<void>
+  subscribeToLeaderboardStateChanges: (listener: () => void) => () => void
 }
 
 export interface RefreshRequest {

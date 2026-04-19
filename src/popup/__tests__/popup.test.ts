@@ -3,6 +3,7 @@ import { JSDOM } from "jsdom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { LeaderboardState, PopupPreferences } from "../../shared/types"
+import { resolveInitialSelection } from "../helpers"
 
 describe("popup React app", () => {
   beforeEach(() => {
@@ -27,6 +28,7 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () => createInitialPopupModel(createState()),
       loadState: async () => createState(),
       savePopupPreferences: async (preferences) => {
         savedPreferences.push(preferences)
@@ -94,6 +96,8 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () =>
+        createInitialPopupModel(createMixedCompositionState()),
       loadState: async () => createMixedCompositionState(),
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
@@ -144,6 +148,7 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () => createInitialPopupModel(createState()),
       loadState: async () => createState(),
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
@@ -168,6 +173,7 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () => createInitialPopupModel(createState()),
       loadState: async () => createState(),
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
@@ -187,6 +193,35 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () =>
+        createInitialPopupModel({
+          ...createState(),
+          messages: [
+            ...createState().messages,
+            {
+              ...createMessage({
+                id: "reply-1",
+                guildId: "guild-1",
+                guildName: "Guild One",
+                channelId: "channel-1",
+                channelName: "alpha",
+                authorKey: "reply-author",
+                authorName: "Reply Author",
+                messageTimestamp: "2026-04-17T08:00:00.000Z"
+              }),
+              isReply: true
+            }
+          ],
+          messageCategoryAssignments: [
+            ...createState().messageCategoryAssignments,
+            {
+              messageId: "reply-1",
+              guildId: "guild-1",
+              categoryId: "cat-feature",
+              assignedAt: "2026-04-17T08:05:00.000Z"
+            }
+          ]
+        }),
       loadState: async () => ({
         ...createState(),
         messages: [
@@ -233,6 +268,7 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () => createInitialPopupModel(createState()),
       loadState: async () => createState(),
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
@@ -262,6 +298,8 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () =>
+        createInitialPopupModel(createEmptyState()),
       loadState: async () => createEmptyState(),
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
@@ -283,6 +321,8 @@ describe("popup React app", () => {
 
     await popupModule.bootstrapPopup({
       document: window.document,
+      loadInitialPopupModel: async () =>
+        createInitialPopupModel(createPastOnlyState()),
       loadState: async () => createPastOnlyState(),
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
@@ -308,6 +348,18 @@ describe("popup React app", () => {
     let loadStateCallCount = 0
     let blockedLoadResolverRegistered = false
     let resolveBlockedLoad = (_state: LeaderboardState) => {}
+    const loadState = async () => {
+      loadStateCallCount += 1
+
+      if (loadStateCallCount === 2) {
+        return await new Promise<LeaderboardState>((resolve) => {
+          blockedLoadResolverRegistered = true
+          resolveBlockedLoad = resolve
+        })
+      }
+
+      return state
+    }
 
     window.setTimeout = ((handler: TimerHandler) => {
       if (typeof handler === "function") {
@@ -320,18 +372,9 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => {
-        loadStateCallCount += 1
-
-        if (loadStateCallCount === 2) {
-          return await new Promise<LeaderboardState>((resolve) => {
-            blockedLoadResolverRegistered = true
-            resolveBlockedLoad = resolve
-          })
-        }
-
-        return state
-      },
+      loadInitialPopupModel: async () =>
+        createInitialPopupModel(await loadState()),
+      loadState,
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: (listener) => {
         storageListenerRegistered = true
@@ -388,21 +431,24 @@ describe("popup React app", () => {
     let stateChangeListener = () => {}
     let loadStateCallCount = 0
     let resolveBlockedLoadState = (_state: LeaderboardState) => {}
+    const loadState = async () => {
+      loadStateCallCount += 1
+
+      if (loadStateCallCount === 1) {
+        return createState()
+      }
+
+      return await new Promise<LeaderboardState>((resolve) => {
+        resolveBlockedLoadState = resolve
+      })
+    }
 
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => {
-        loadStateCallCount += 1
-
-        if (loadStateCallCount === 1) {
-          return createState()
-        }
-
-        return await new Promise<LeaderboardState>((resolve) => {
-          resolveBlockedLoadState = resolve
-        })
-      },
+      loadInitialPopupModel: async () =>
+        createInitialPopupModel(await loadState()),
+      loadState,
       savePopupPreferences: async () => {},
       subscribeToLeaderboardStateChanges: (listener) => {
         stateChangeListener = listener
@@ -454,6 +500,13 @@ function createPopupDom() {
       url: "https://example.test"
     }
   )
+}
+
+function createInitialPopupModel(state: LeaderboardState) {
+  return {
+    state,
+    selection: resolveInitialSelection(state)
+  }
 }
 
 function createState(): LeaderboardState {
