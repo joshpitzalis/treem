@@ -1,15 +1,11 @@
 import type { loadState, savePopupPreferences } from "../shared/storage"
 import type { TimeRangeKey } from "../shared/types"
-export type PopupStorageChangeListener = (
-  changes: Record<string, unknown>,
-  areaName: string
-) => void
 
 export interface PopupRuntime {
   document: Document
   loadState: typeof loadState
   savePopupPreferences: typeof savePopupPreferences
-  addStorageChangeListener: (listener: PopupStorageChangeListener) => void
+  subscribeToLeaderboardStateChanges: (listener: () => void) => () => void
 }
 
 export interface PopupSelection {

@@ -97,11 +97,10 @@ function PopupApp(input: {
     selectionRef.current = selection
   }, [selection])
 
-  useEffect(() => {
-    input.runtime.addStorageChangeListener((changes, areaName) => {
-      if (areaName !== "local") return
-      if (!("discordLeaderboardState" in changes)) return
 
+
+  useEffect(() => {
+    return input.runtime.subscribeToLeaderboardStateChanges(() => {
       void requestRefresh({ showLoading: true })
     })
   }, [input.runtime])
@@ -396,8 +395,20 @@ function createBrowserRuntime(): PopupRuntime {
         })
       ),
     savePopupPreferences,
-    addStorageChangeListener: (listener) => {
-      chrome.storage.onChanged.addListener(listener)
+    subscribeToLeaderboardStateChanges: (listener) => {
+      const handleChange = (
+        changes: Record<string, unknown>,
+        areaName: string
+      ) => {
+        if (areaName !== "local") return
+        if (!("discordLeaderboardState" in changes)) return
+        listener()
+      }
+
+      chrome.storage.onChanged.addListener(handleChange)
+      return () => {
+        chrome.storage.onChanged.removeListener(handleChange)
+      }
     }
   }
 }
