@@ -2,7 +2,12 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react"
 import { JSDOM } from "jsdom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { LeaderboardState, PopupPreferences } from "../../shared/types"
+import type { LeaderboardState } from "../../shared/types"
+import {
+  resolveInitialSelection,
+  resolvePreservedSelection
+} from "../lib/helpers"
+import type { PopupSelection } from "../types"
 
 describe("popup React app", () => {
   beforeEach(() => {
@@ -22,16 +27,18 @@ describe("popup React app", () => {
 
   it("mounts popup shell through React and keeps leaderboard and treemap on same scope", async () => {
     const { window } = createPopupDom()
-    const savedPreferences: PopupPreferences[] = []
+    const savedSelections: PopupSelection[] = []
 
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => createState(),
-      savePopupPreferences: async (preferences) => {
-        savedPreferences.push(preferences)
+      loadInitialPopupModel: async () => createPopupModel(createState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createState(), previousSelection),
+      saveSelection: async (selection) => {
+        savedSelections.push(selection)
       },
-      addStorageChangeListener: () => {}
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const page = within(window.document.body)
@@ -85,7 +92,7 @@ describe("popup React app", () => {
     expect(
       window.document.querySelector("#status")?.textContent ?? ""
     ).not.toMatch(/Processing/)
-    expect(savedPreferences).toHaveLength(2)
+    expect(savedSelections).toHaveLength(2)
   })
 
   it("renders mixed named categories plus uncategorized and omits empty categories per time slice", async () => {
@@ -94,9 +101,15 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => createMixedCompositionState(),
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      loadInitialPopupModel: async () =>
+        createPopupModel(createMixedCompositionState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(
+          createMixedCompositionState(),
+          previousSelection
+        ),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const page = within(window.document.body)
@@ -144,9 +157,11 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => createState(),
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      loadInitialPopupModel: async () => createPopupModel(createState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     expect(readTreemapTileArea(window.document, "cat-bug")).toBeCloseTo(5000, 0)
@@ -168,9 +183,11 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => createState(),
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      loadInitialPopupModel: async () => createPopupModel(createState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const bugTile = window.document.querySelector<HTMLElement>(
@@ -187,36 +204,69 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => ({
-        ...createState(),
-        messages: [
-          ...createState().messages,
-          {
-            ...createMessage({
-              id: "reply-1",
+      loadInitialPopupModel: async () =>
+        createPopupModel({
+          ...createState(),
+          messages: [
+            ...createState().messages,
+            {
+              ...createMessage({
+                id: "reply-1",
+                guildId: "guild-1",
+                guildName: "Guild One",
+                channelId: "channel-1",
+                channelName: "alpha",
+                authorKey: "reply-author",
+                authorName: "Reply Author",
+                messageTimestamp: "2026-04-17T08:00:00.000Z"
+              }),
+              isReply: true
+            }
+          ],
+          messageCategoryAssignments: [
+            ...createState().messageCategoryAssignments,
+            {
+              messageId: "reply-1",
               guildId: "guild-1",
-              guildName: "Guild One",
-              channelId: "channel-1",
-              channelName: "alpha",
-              authorKey: "reply-author",
-              authorName: "Reply Author",
-              messageTimestamp: "2026-04-17T08:00:00.000Z"
-            }),
-            isReply: true
-          }
-        ],
-        messageCategoryAssignments: [
-          ...createState().messageCategoryAssignments,
+              categoryId: "cat-feature",
+              assignedAt: "2026-04-17T08:05:00.000Z"
+            }
+          ]
+        }),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(
           {
-            messageId: "reply-1",
-            guildId: "guild-1",
-            categoryId: "cat-feature",
-            assignedAt: "2026-04-17T08:05:00.000Z"
-          }
-        ]
-      }),
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+            ...createState(),
+            messages: [
+              ...createState().messages,
+              {
+                ...createMessage({
+                  id: "reply-1",
+                  guildId: "guild-1",
+                  guildName: "Guild One",
+                  channelId: "channel-1",
+                  channelName: "alpha",
+                  authorKey: "reply-author",
+                  authorName: "Reply Author",
+                  messageTimestamp: "2026-04-17T08:00:00.000Z"
+                }),
+                isReply: true
+              }
+            ],
+            messageCategoryAssignments: [
+              ...createState().messageCategoryAssignments,
+              {
+                messageId: "reply-1",
+                guildId: "guild-1",
+                categoryId: "cat-feature",
+                assignedAt: "2026-04-17T08:05:00.000Z"
+              }
+            ]
+          },
+          previousSelection
+        ),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const treemapText =
@@ -233,9 +283,11 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => createState(),
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      loadInitialPopupModel: async () => createPopupModel(createState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     const bugTile = window.document.querySelector<HTMLElement>(
@@ -262,9 +314,11 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => createEmptyState(),
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      loadInitialPopupModel: async () => createPopupModel(createEmptyState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createEmptyState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     let page = within(window.document.body)
@@ -283,9 +337,12 @@ describe("popup React app", () => {
 
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => createPastOnlyState(),
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: () => {}
+      loadInitialPopupModel: async () =>
+        createPopupModel(createPastOnlyState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(createPastOnlyState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: () => () => {}
     })
 
     page = within(window.document.body)
@@ -303,14 +360,23 @@ describe("popup React app", () => {
     const { window } = createPopupDom()
     const originalSetTimeout = window.setTimeout.bind(window)
     let storageListenerRegistered = false
-    let storageListener = (
-      _changes: Record<string, unknown>,
-      _areaName: string
-    ) => {}
+    let stateChangeListener = () => {}
     let state = createState()
     let loadStateCallCount = 0
     let blockedLoadResolverRegistered = false
     let resolveBlockedLoad = (_state: LeaderboardState) => {}
+    const loadState = async () => {
+      loadStateCallCount += 1
+
+      if (loadStateCallCount === 2) {
+        return await new Promise<LeaderboardState>((resolve) => {
+          blockedLoadResolverRegistered = true
+          resolveBlockedLoad = resolve
+        })
+      }
+
+      return state
+    }
 
     window.setTimeout = ((handler: TimerHandler) => {
       if (typeof handler === "function") {
@@ -323,22 +389,14 @@ describe("popup React app", () => {
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => {
-        loadStateCallCount += 1
-
-        if (loadStateCallCount === 2) {
-          return await new Promise<LeaderboardState>((resolve) => {
-            blockedLoadResolverRegistered = true
-            resolveBlockedLoad = resolve
-          })
-        }
-
-        return state
-      },
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: (listener) => {
+      loadInitialPopupModel: async () => createPopupModel(await loadState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(await loadState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: (listener) => {
         storageListenerRegistered = true
-        storageListener = listener
+        stateChangeListener = listener
+        return () => {}
       }
     })
 
@@ -346,7 +404,7 @@ describe("popup React app", () => {
 
     expect(storageListenerRegistered).toBe(true)
 
-    storageListener({ discordLeaderboardState: {} }, "local")
+    stateChangeListener()
 
     state = {
       ...state,
@@ -373,7 +431,7 @@ describe("popup React app", () => {
       updatedAt: "2026-04-16T12:31:00.000Z"
     }
 
-    storageListener({ discordLeaderboardState: {} }, "local")
+    stateChangeListener()
     expect(blockedLoadResolverRegistered).toBe(true)
     resolveBlockedLoad(createState())
     await new Promise((resolve) => originalSetTimeout(resolve, 0))
@@ -387,34 +445,35 @@ describe("popup React app", () => {
 
   it("refreshes popup state without rendering a sync status line", async () => {
     const { window } = createPopupDom()
-    let storageListener = (
-      _changes: Record<string, unknown>,
-      _areaName: string
-    ) => {}
+    let stateChangeListener = () => {}
     let loadStateCallCount = 0
     let resolveBlockedLoadState = (_state: LeaderboardState) => {}
+    const loadState = async () => {
+      loadStateCallCount += 1
+
+      if (loadStateCallCount === 1) {
+        return createState()
+      }
+
+      return await new Promise<LeaderboardState>((resolve) => {
+        resolveBlockedLoadState = resolve
+      })
+    }
 
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
-      loadState: async () => {
-        loadStateCallCount += 1
-
-        if (loadStateCallCount === 1) {
-          return createState()
-        }
-
-        return await new Promise<LeaderboardState>((resolve) => {
-          resolveBlockedLoadState = resolve
-        })
-      },
-      savePopupPreferences: async () => {},
-      addStorageChangeListener: (listener) => {
-        storageListener = listener
+      loadInitialPopupModel: async () => createPopupModel(await loadState()),
+      refreshPopupModel: async (previousSelection) =>
+        createRefreshedPopupModel(await loadState(), previousSelection),
+      saveSelection: async () => {},
+      subscribeToLeaderboardStateChanges: (listener) => {
+        stateChangeListener = listener
+        return () => {}
       }
     })
 
-    storageListener({ discordLeaderboardState: {} }, "local")
+    stateChangeListener()
 
     await waitFor(() => {
       expect(window.document.querySelector("#sync-status")).toBeNull()
@@ -444,7 +503,7 @@ async function loadPopupModule(window: {
     window
   })
 
-  return await import("..")
+  return await import("../runTime")
 }
 
 function createPopupDom() {
@@ -458,6 +517,23 @@ function createPopupDom() {
       url: "https://example.test"
     }
   )
+}
+
+function createPopupModel(state: LeaderboardState) {
+  return {
+    state,
+    selection: resolveInitialSelection(state)
+  }
+}
+
+function createRefreshedPopupModel(
+  state: LeaderboardState,
+  previousSelection: Parameters<typeof resolvePreservedSelection>[1]
+) {
+  return {
+    state,
+    selection: resolvePreservedSelection(state, previousSelection)
+  }
 }
 
 function createState(): LeaderboardState {

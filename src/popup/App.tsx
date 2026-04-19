@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react"
-import { flushSync } from "react-dom"
-import { createRoot, type Root } from "react-dom/client"
 import "./lib/styles.css"
 import {
   filterMessagesByView,
@@ -10,70 +8,22 @@ import {
   summarizeLeaderboard,
   summarizeTreemap
 } from "../shared/leaderboard-query"
-import { loadState, savePopupPreferences } from "../shared/storage"
 import type {
+  LeaderboardState,
   TimeRangeKey
 } from "../shared/types"
-import {
-  leaderboardStateSchema
-} from "../shared/types"
+import { ALL_CHANNELS_VALUE } from "./lib/constants"
 import type { PopupRuntime, PopupSelection, RefreshRequest } from "./types"
-import { AtomRegistryProvider } from "./lib/atom-registry-provider";
 import { ReadinessChip, LeaderboardSection, TreemapSection } from "./components"
 import {
   createEmptyReadinessStates,
-  ensurePopupMountNode,
   getScrollHint,
   mergeRefreshRequests,
   resolveChannelId,
-  resolveInitialSelection,
-  resolvePreservedSelection,
   resolveScopeLabel
-} from "./helpers"
+} from "./lib/helpers"
 
-export type LeaderboardState = typeof leaderboardStateSchema.Type
-
-export const ALL_CHANNELS_VALUE = "__all__"
-
-export let popupRuntime: PopupRuntime = createBrowserRuntime()
-export let popupRoot: Root | null = null
-export let popupMountNode: HTMLElement | null = null
-export let renderKey = 0
-
-export async function bootstrapPopup(
-  runtimeOverrides: Partial<PopupRuntime> = {}
-): Promise<void> {
-  popupRuntime = {
-    ...createBrowserRuntime(),
-    ...runtimeOverrides
-  }
-
-  const mountNode = ensurePopupMountNode(popupRuntime.document)
-  const initialState = await popupRuntime.loadState()
-  const initialSelection = resolveInitialSelection(initialState)
-
-  if (!popupRoot || popupMountNode !== mountNode) {
-    popupRoot = createRoot(mountNode)
-    popupMountNode = mountNode
-  }
-
-  renderKey += 1
-
-  flushSync(() => {
-    popupRoot?.render(
-      <AtomRegistryProvider>
-      <PopupApp
-        key={renderKey}
-        runtime={popupRuntime}
-        initialState={initialState}
-        initialSelection={initialSelection}
-        />
-      </AtomRegistryProvider>
-    )
-  })
-}
-
-function PopupApp(input: {
+export function PopupApp(input: {
   runtime: PopupRuntime
   initialState: LeaderboardState
   initialSelection: PopupSelection
@@ -96,10 +46,7 @@ function PopupApp(input: {
   }, [selection])
 
   useEffect(() => {
-    input.runtime.addStorageChangeListener((changes, areaName) => {
-      if (areaName !== "local") return
-      if (!("discordLeaderboardState" in changes)) return
-
+    return input.runtime.subscribeToLeaderboardStateChanges(() => {
       void requestRefresh({ showLoading: true })
     })
   }, [input.runtime])
@@ -186,20 +133,17 @@ function PopupApp(input: {
   }
 
   async function runRefresh(_request: RefreshRequest): Promise<void> {
-    const nextState = await input.runtime.loadState()
-    const nextSelection = resolvePreservedSelection(
-      nextState,
+    const nextModel = await input.runtime.refreshPopupModel(
       selectionRef.current
     )
 
-    setCurrentState(nextState)
-    setSelection(nextSelection)
+    setCurrentState(nextModel.state)
+    setSelection(nextModel.selection)
   }
 
   async function handleGuildChange(nextGuildId: string) {
     const preferredChannelId =
-      currentStateRef.current.popupPreferences?.selectedChannelId ??
-      ALL_CHANNELS_VALUE
+      selectionRef.current.channelId ?? ALL_CHANNELS_VALUE
     const nextChannels = listChannels(currentStateRef.current.messages, nextGuildId)
     const nextChannelId = resolveChannelId(preferredChannelId, nextChannels)
     const nextSelection = {
@@ -235,22 +179,7 @@ function PopupApp(input: {
   async function persistPopupPreferences(
     nextSelection: PopupSelection
   ): Promise<void> {
-    if (!nextSelection.guildId) return
-
-    await input.runtime.savePopupPreferences({
-      selectedGuildId: nextSelection.guildId,
-      selectedChannelId: nextSelection.channelId,
-      selectedTimeRange: nextSelection.timeRange
-    })
-
-    setCurrentState((previousState) => ({
-      ...previousState,
-      popupPreferences: {
-        selectedGuildId: nextSelection.guildId,
-        selectedChannelId: nextSelection.channelId,
-        selectedTimeRange: nextSelection.timeRange
-      }
-    }))
+    await input.runtime.saveSelection(nextSelection)
   }
 
   return (
@@ -374,18 +303,3 @@ function PopupApp(input: {
     </main>
   )
 }
-
-function createBrowserRuntime(): PopupRuntime {
-  return {
-    document,
-    loadState,
-    savePopupPreferences,
-    addStorageChangeListener: (listener) => {
-      chrome.storage.onChanged.addListener(listener)
-    }
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  void bootstrapPopup()
-})

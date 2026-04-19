@@ -12,7 +12,7 @@ import {
   describeTreemapTileDensity,
   formatPercentage,
   formatScore
-} from "../helpers"
+} from "../lib/helpers"
 
 export function ReadinessChip(input: { state: DataReadiness }) {
   const copy =

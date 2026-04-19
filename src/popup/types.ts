@@ -1,21 +1,22 @@
-import type { loadState, savePopupPreferences } from "../shared/storage"
-import type { TimeRangeKey } from "../shared/types"
-export type PopupStorageChangeListener = (
-  changes: Record<string, unknown>,
-  areaName: string
-) => void
-
-export interface PopupRuntime {
-  document: Document
-  loadState: typeof loadState
-  savePopupPreferences: typeof savePopupPreferences
-  addStorageChangeListener: (listener: PopupStorageChangeListener) => void
-}
+import type { LeaderboardState, TimeRangeKey } from "../shared/types"
 
 export interface PopupSelection {
   guildId: string | null
   channelId: string
   timeRange: TimeRangeKey
+}
+
+export interface PopupModel {
+  state: LeaderboardState
+  selection: PopupSelection
+}
+
+export interface PopupRuntime {
+  document: Document
+  loadInitialPopupModel: () => Promise<PopupModel>
+  refreshPopupModel: (previousSelection: PopupSelection) => Promise<PopupModel>
+  saveSelection: (selection: PopupSelection) => Promise<void>
+  subscribeToLeaderboardStateChanges: (listener: () => void) => () => void
 }
 
 export interface RefreshRequest {

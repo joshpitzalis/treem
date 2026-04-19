@@ -1,3 +1,8 @@
+type StorageChangeListener = (
+  changes: Record<string, { oldValue?: unknown; newValue?: unknown }>,
+  areaName: string
+) => void
+
 declare const chrome: {
   storage: {
     local: {
@@ -7,12 +12,8 @@ declare const chrome: {
       set(items: Record<string, unknown>): Promise<void>
     }
     onChanged: {
-      addListener(
-        callback: (
-          changes: Record<string, { oldValue?: unknown; newValue?: unknown }>,
-          areaName: string
-        ) => void
-      ): void
+      addListener(callback: StorageChangeListener): void
+      removeListener(callback: StorageChangeListener): void
     }
   }
 }
