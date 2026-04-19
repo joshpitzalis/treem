@@ -5,9 +5,7 @@ import {
   saveState,
   saveViewerProfile
 } from "../shared/storage"
-import { discordCaptureSource } from "./discord-capture-source"
-
-const captureSource = discordCaptureSource
+import { resolveCaptureSource } from "./resolve-capture-source"
 
 let captureQueued = false
 let observerStarted = false
@@ -29,6 +27,9 @@ function queueCapture(): void {
 }
 
 async function captureVisibleMessages(): Promise<void> {
+  const captureSource = resolveCaptureSource(window.location)
+  if (!captureSource) return
+
   const community = captureSource.detectCurrentCommunity()
   const viewerProfile = captureSource.detectViewerProfile()
 

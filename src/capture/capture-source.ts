@@ -12,7 +12,10 @@ export interface CaptureCategorizationRuntime {
   saveState: (state: LeaderboardState) => Promise<void>
 }
 
+export type CaptureSourceLocation = Pick<Location, "hostname">
+
 export interface CaptureSource {
+  supportsLocation(location: CaptureSourceLocation): boolean
   detectCurrentCommunity(): CommunityRef | null
   detectViewerProfile(): ViewerProfile | null
   detectLiveEdge(): boolean
