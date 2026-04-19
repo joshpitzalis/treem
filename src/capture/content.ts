@@ -5,13 +5,9 @@ import {
   saveState,
   saveViewerProfile
 } from "../shared/storage"
-import { enhanceCategorizationControls } from "./categorization"
-import {
-  detectCurrentCommunity,
-  detectLiveEdge,
-  detectViewerProfile,
-  extractVisibleMessages
-} from "./message-parser"
+import { discordCaptureSource } from "./discord-capture-source"
+
+const captureSource = discordCaptureSource
 
 let captureQueued = false
 let observerStarted = false
@@ -33,8 +29,8 @@ function queueCapture(): void {
 }
 
 async function captureVisibleMessages(): Promise<void> {
-  const community = detectCurrentCommunity()
-  const viewerProfile = detectViewerProfile()
+  const community = captureSource.detectCurrentCommunity()
+  const viewerProfile = captureSource.detectViewerProfile()
 
   if (viewerProfile) {
     await saveViewerProfile(viewerProfile)
@@ -46,15 +42,15 @@ async function captureVisibleMessages(): Promise<void> {
     guildId: community.guildId,
     channelId: community.channelId,
     capturedAt: new Date().toISOString(),
-    sawLiveEdge: detectLiveEdge()
+    sawLiveEdge: captureSource.detectLiveEdge()
   })
 
-  const messages = extractVisibleMessages(community)
+  const messages = captureSource.extractVisibleMessages(community)
   if (messages.length > 0) {
     await mergeMessages(messages)
   }
 
-  await enhanceCategorizationControls({
+  await captureSource.enhanceCategorizationControls({
     document,
     guildId: community.guildId,
     loadState,

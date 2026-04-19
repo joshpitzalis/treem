@@ -1,6 +1,7 @@
 import { flushSync } from "react-dom"
 import { createRoot, type Root } from "react-dom/client"
 import type { LeaderboardState } from "../shared/types"
+import type { CaptureCategorizationRuntime } from "./capture-source"
 import { looksLikeReplyMessageNode } from "./message-parser"
 import categoryControlStyles from "./discord-categorization-control.css?inline"
 import {
@@ -16,30 +17,23 @@ const MESSAGE_SELECTOR = [
 
 const hostRoots = new WeakMap<HTMLElement, Root>()
 
-interface CategorizationRuntime {
-  document: Document
-  guildId: string
-  loadState: () => Promise<LeaderboardState>
-  saveState: (state: LeaderboardState) => Promise<void>
-}
-
 interface MessageRenderContext {
   anchorNode: HTMLElement
   host: HTMLElement
   layout: "header"
   messageKey: string
-  runtime: CategorizationRuntime
+  runtime: CaptureCategorizationRuntime
 }
 
 export async function enhanceCategorizationControls(
-  runtime: CategorizationRuntime
+  runtime: CaptureCategorizationRuntime
 ): Promise<void> {
   const state = await runtime.loadState()
   renderAllMessageControls(runtime, state)
 }
 
 function renderAllMessageControls(
-  runtime: CategorizationRuntime,
+  runtime: CaptureCategorizationRuntime,
   state: LeaderboardState
 ): void {
   const capturedTopLevelMessageIds = new Set(
@@ -66,7 +60,7 @@ function renderAllMessageControls(
 function syncMessageControl(input: {
   capturedTopLevelMessageIds: Set<string>
   messageNode: HTMLElement
-  runtime: CategorizationRuntime
+  runtime: CaptureCategorizationRuntime
   state: LeaderboardState
 }): void {
   const messageContext = resolveMessageRenderContext(
@@ -97,7 +91,7 @@ function syncMessageControl(input: {
 
 function resolveMessageRenderContext(
   messageNode: HTMLElement,
-  runtime: CategorizationRuntime
+  runtime: CaptureCategorizationRuntime
 ): MessageRenderContext | null {
   const messageId = extractMessageId(messageNode)
   if (!messageId) return null
@@ -153,7 +147,7 @@ function renderMessageControl(input: {
   host: HTMLElement
   layout: "header"
   messageKey: string
-  runtime: CategorizationRuntime
+  runtime: CaptureCategorizationRuntime
   state: LeaderboardState
 }): void {
   ensureCategoryControlStyles(input.host.ownerDocument)
