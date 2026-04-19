@@ -16,12 +16,7 @@ import type {
 } from "../../shared/types"
 import { PopupStateService } from "../services/popup-state-service"
 import { LeaderboardStorage } from "../services/storage-service"
-import type {
-  PopupSelection,
-  RefreshRequest,
-  TreemapRect,
-  TreemapTileDensity
-} from "../types"
+import type { PopupSelection, TreemapRect, TreemapTileDensity } from "../types"
 import {
   ALL_CHANNELS_VALUE,
   MIN_PROCESSING_MS,
@@ -99,17 +94,6 @@ export function resolvePreservedSelection(
     guildId,
     channelId: resolveChannelId(preferredChannelId, channels),
     timeRange: previousSelection.timeRange
-  }
-}
-
-export function mergeRefreshRequests(
-  current: RefreshRequest | null,
-  next: RefreshRequest
-): RefreshRequest {
-  if (!current) return next
-
-  return {
-    showLoading: current.showLoading || next.showLoading
   }
 }
 

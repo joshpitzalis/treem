@@ -1,45 +1,72 @@
+import {
+  useAtomInitialValues,
+  useAtomMount,
+  useAtomSet,
+  useAtomSubscribe,
+  useAtomValue
+} from "@effect/atom-react"
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult"
 import { useEffect, useRef, useState } from "react"
 import "./lib/styles.css"
+import type { LeaderboardState } from "../shared/types"
 import {
-  filterMessagesByView,
-  listChannels,
-  listGuilds,
-  listReadinessStates,
-  summarizeLeaderboard,
-  summarizeTreemap
-} from "../shared/leaderboard-query"
-import type {
-  LeaderboardState,
-  TimeRangeKey
-} from "../shared/types"
+  popupChannelsAtom,
+  popupGuildsAtom,
+  popupLeaderboardSummaryAtom,
+  popupPersistSelectionAtom,
+  popupReadinessStatesAtom,
+  popupRefreshModelAtom,
+  popupRefreshRequestAtom,
+  popupResolvedChannelIdAtom,
+  popupRuntimeAtom,
+  popupSelectChannelAtom,
+  popupSelectGuildAtom,
+  popupSelectTimeRangeAtom,
+  popupScopeLabelAtom,
+  popupSelectedGuildIdAtom,
+  popupSelectionAtom,
+  popupStateAtom,
+  popupStatusTextAtom,
+  popupTreemapSummaryAtom
+} from "./atoms/popup-atoms"
 import { ALL_CHANNELS_VALUE } from "./lib/constants"
-import type { PopupRuntime, PopupSelection, RefreshRequest } from "./types"
+import type { PopupModel, PopupRuntime, PopupSelection } from "./types"
 import { ReadinessChip, LeaderboardSection, TreemapSection } from "./components"
-import {
-  createEmptyReadinessStates,
-  getScrollHint,
-  mergeRefreshRequests,
-  resolveChannelId,
-  resolveScopeLabel
-} from "./lib/helpers"
 
 export function PopupApp(input: {
   runtime: PopupRuntime
   initialState: LeaderboardState
   initialSelection: PopupSelection
 }) {
-  const [currentState, setCurrentState] = useState(input.initialState)
-  const [selection, setSelection] = useState(input.initialSelection)
+  useAtomInitialValues([
+    [popupRuntimeAtom, input.runtime],
+    [popupStateAtom, input.initialState],
+    [popupSelectionAtom, input.initialSelection]
+  ])
+
+  useAtomMount(popupRefreshModelAtom)
+  useAtomMount(popupPersistSelectionAtom)
+
+  const selection = useAtomValue(popupSelectionAtom)
+  const guilds = useAtomValue(popupGuildsAtom)
+  const selectedGuildId = useAtomValue(popupSelectedGuildIdAtom)
+  const channels = useAtomValue(popupChannelsAtom)
+  const resolvedChannelId = useAtomValue(popupResolvedChannelIdAtom)
+  const scopeLabel = useAtomValue(popupScopeLabelAtom)
+  const leaderboardSummary = useAtomValue(popupLeaderboardSummaryAtom)
+  const treemapSummary = useAtomValue(popupTreemapSummaryAtom)
+  const readinessStates = useAtomValue(popupReadinessStatesAtom)
+  const statusText = useAtomValue(popupStatusTextAtom)
+  const setCurrentState = useAtomSet(popupStateAtom)
+  const requestRefresh = useAtomSet(popupRefreshRequestAtom)
+  const selectGuild = useAtomSet(popupSelectGuildAtom)
+  const selectChannel = useAtomSet(popupSelectChannelAtom)
+  const selectTimeRange = useAtomSet(popupSelectTimeRangeAtom)
+  const setSelection = useAtomSet(popupSelectionAtom)
   const [scoreInfoOpen, setScoreInfoOpen] = useState(false)
 
-  const refreshInFlightRef = useRef(false)
-  const queuedRefreshRef = useRef<RefreshRequest | null>(null)
-  const currentStateRef = useRef(currentState)
+  const refreshRequestIdRef = useRef(0)
   const selectionRef = useRef(selection)
-
-  useEffect(() => {
-    currentStateRef.current = currentState
-  }, [currentState])
 
   useEffect(() => {
     selectionRef.current = selection
@@ -47,139 +74,24 @@ export function PopupApp(input: {
 
   useEffect(() => {
     return input.runtime.subscribeToLeaderboardStateChanges(() => {
-      void requestRefresh({ showLoading: true })
+      refreshRequestIdRef.current += 1
+      requestRefresh({
+        id: refreshRequestIdRef.current,
+        selection: selectionRef.current
+      })
     })
-  }, [input.runtime])
+  }, [input.runtime, requestRefresh])
 
-  const guilds = listGuilds(currentState.messages)
+  useAtomSubscribe(popupRefreshModelAtom, (result) => {
+    if (!AsyncResult.isSuccess(result)) return
+    if (!result.value) return
 
-  const selectedGuildId =
-    selection.guildId &&
-    guilds.some((guild) => guild.guildId === selection.guildId)
-      ? selection.guildId
-      : guilds[0]?.guildId ?? null
-  const channels = selectedGuildId
-    ? listChannels(currentState.messages, selectedGuildId)
-    : []
-  const resolvedChannelId = resolveChannelId(selection.channelId, channels)
-  const scopedChannelId =
-    resolvedChannelId === ALL_CHANNELS_VALUE ? null : resolvedChannelId
-  const scopeLabel =
-    guilds.length === 0
-      ? "No server selected yet"
-      : resolveScopeLabel(guilds, channels, selectedGuildId, resolvedChannelId)
-
-  const filteredMessages =
-    selectedGuildId == null
-      ? []
-      : filterMessagesByView({
-          messages: currentState.messages,
-          guildId: selectedGuildId,
-          scopeMode: scopedChannelId ? "channel" : "server",
-          channelId: scopedChannelId,
-          timeRange: selection.timeRange
-        })
-
-  const leaderboardSummary = summarizeLeaderboard({
-    messages: filteredMessages,
-    viewerProfile: currentState.viewerProfile
+    applyRefreshedPopupModel(result.value)
   })
-  const treemapMessages = filteredMessages.filter(
-    (message) => message.isReply === false
-  )
-  const treemapSummary = summarizeTreemap({
-    messages: treemapMessages,
-    categories: currentState.categories,
-    messageCategoryAssignments: currentState.messageCategoryAssignments
-  })
-  const readinessStates =
-    selectedGuildId == null
-      ? createEmptyReadinessStates()
-      : listReadinessStates({
-          messages: currentState.messages,
-          scopeObservations: currentState.scopeObservations,
-          guildId: selectedGuildId,
-          channelId: scopedChannelId
-        })
 
-  const statusText =
-    guilds.length === 0
-      ? "Open Discord in Chrome and browse a server to start collecting data."
-      : getScrollHint(currentState, selectedGuildId, scopedChannelId)
-
-  async function requestRefresh(nextRequest: RefreshRequest): Promise<void> {
-    if (refreshInFlightRef.current) {
-      queuedRefreshRef.current = mergeRefreshRequests(
-        queuedRefreshRef.current,
-        nextRequest
-      )
-      return
-    }
-
-    refreshInFlightRef.current = true
-
-    try {
-      let pendingRefresh: RefreshRequest | null = nextRequest
-
-      while (pendingRefresh) {
-        queuedRefreshRef.current = null
-        await runRefresh(pendingRefresh)
-        pendingRefresh = queuedRefreshRef.current
-      }
-    } finally {
-      refreshInFlightRef.current = false
-      queuedRefreshRef.current = null
-    }
-  }
-
-  async function runRefresh(_request: RefreshRequest): Promise<void> {
-    const nextModel = await input.runtime.refreshPopupModel(
-      selectionRef.current
-    )
-
+  function applyRefreshedPopupModel(nextModel: PopupModel): void {
     setCurrentState(nextModel.state)
     setSelection(nextModel.selection)
-  }
-
-  async function handleGuildChange(nextGuildId: string) {
-    const preferredChannelId =
-      selectionRef.current.channelId ?? ALL_CHANNELS_VALUE
-    const nextChannels = listChannels(currentStateRef.current.messages, nextGuildId)
-    const nextChannelId = resolveChannelId(preferredChannelId, nextChannels)
-    const nextSelection = {
-      guildId: nextGuildId,
-      channelId: nextChannelId,
-      timeRange: selectionRef.current.timeRange
-    }
-
-    setSelection(nextSelection)
-    await persistPopupPreferences(nextSelection)
-  }
-
-  async function handleChannelChange(nextChannelId: string) {
-    const nextSelection = {
-      ...selectionRef.current,
-      channelId: nextChannelId
-    }
-
-    setSelection(nextSelection)
-    await persistPopupPreferences(nextSelection)
-  }
-
-  async function handleTimeRangeChange(nextTimeRange: TimeRangeKey) {
-    const nextSelection = {
-      ...selectionRef.current,
-      timeRange: nextTimeRange
-    }
-
-    setSelection(nextSelection)
-    await persistPopupPreferences(nextSelection)
-  }
-
-  async function persistPopupPreferences(
-    nextSelection: PopupSelection
-  ): Promise<void> {
-    await input.runtime.saveSelection(nextSelection)
   }
 
   return (
@@ -213,7 +125,7 @@ export function PopupApp(input: {
             value={selectedGuildId ?? ""}
             disabled={guilds.length === 0}
             onChange={(event) => {
-              void handleGuildChange(event.currentTarget.value)
+              selectGuild(event.currentTarget.value)
             }}
           >
             {guilds.length === 0 ? (
@@ -237,7 +149,7 @@ export function PopupApp(input: {
             value={resolvedChannelId}
             disabled={guilds.length === 0}
             onChange={(event) => {
-              void handleChannelChange(event.currentTarget.value)
+              selectChannel(event.currentTarget.value)
             }}
           >
             <option value={ALL_CHANNELS_VALUE}>All channel</option>
@@ -288,7 +200,7 @@ export function PopupApp(input: {
             scopeLabel={scopeLabel}
             selectedTimeRange={selection.timeRange}
             summary={leaderboardSummary}
-            onTimeRangeChange={handleTimeRangeChange}
+            onTimeRangeChange={selectTimeRange}
           />
         )}
       </section>
