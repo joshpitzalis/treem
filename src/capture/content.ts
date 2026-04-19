@@ -1,98 +1,42 @@
-import {
-  loadState,
-  mergeMessages,
-  saveScopeObservation,
-  saveState,
-  saveViewerProfile
-} from "../shared/storage"
-import { enhanceCategorizationControls } from "./categorization"
-import {
-  detectCurrentCommunity,
-  detectLiveEdge,
-  detectViewerProfile,
-  extractVisibleMessages
-} from "./message-parser"
-
-let captureQueued = false
-let observerStarted = false
+import { Effect } from "effect"
+import { createCaptureLoop } from "./helpers/capture-loop"
+import { CaptureService, runCaptureEffect } from "./services/capture-service"
 
 console.info("[treem] capture loaded", {
   version: __TREEM_EXTENSION_VERSION__,
   build: __TREEM_BUILD_STAMP__
 })
 
-function queueCapture(): void {
-  if (captureQueued) return
-
-  captureQueued = true
-
-  window.setTimeout(async () => {
-    captureQueued = false
-    await captureVisibleMessages()
-  }, 750)
-}
-
 async function captureVisibleMessages(): Promise<void> {
-  const community = detectCurrentCommunity()
-  const viewerProfile = detectViewerProfile()
-
-  if (viewerProfile) {
-    await saveViewerProfile(viewerProfile)
-  }
-
-  if (!community) return
-
-  await saveScopeObservation({
-    guildId: community.guildId,
-    channelId: community.channelId,
-    capturedAt: new Date().toISOString(),
-    sawLiveEdge: detectLiveEdge()
-  })
-
-  const messages = extractVisibleMessages(community)
-  if (messages.length > 0) {
-    await mergeMessages(messages)
-  }
-
-  await enhanceCategorizationControls({
-    document,
-    guildId: community.guildId,
-    loadState,
-    saveState
-  })
+  await runCaptureEffect(
+    Effect.gen(function* () {
+      const capture = yield* CaptureService
+      yield* capture.captureOnce()
+    })
+  )
 }
 
-function startObserver(): void {
-  if (observerStarted) return
-
-  observerStarted = true
-
-  const observer = new MutationObserver(() => {
-    queueCapture()
-  })
-
-  observer.observe(document.body, {
-    subtree: true,
-    childList: true,
-    characterData: false
-  })
-
-  document.addEventListener("scroll", queueCapture, {
-    passive: true,
-    capture: true
-  })
-  window.addEventListener("popstate", queueCapture)
-  window.addEventListener("focus", queueCapture)
-  document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") queueCapture()
-  })
-
-  queueCapture()
-  window.setInterval(queueCapture, 10_000)
-}
+const captureLoop = createCaptureLoop({
+  document,
+  window,
+  observeMutations: (onMutation: () => void) => {
+    const observer = new MutationObserver(onMutation)
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: false
+    })
+  },
+  runCapture: captureVisibleMessages,
+  onCaptureError: (error: unknown) => {
+    console.error("[treem] capture failed", error)
+  }
+})
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", startObserver, { once: true })
+  document.addEventListener("DOMContentLoaded", () => captureLoop.start(), {
+    once: true
+  })
 } else {
-  startObserver()
+  captureLoop.start()
 }

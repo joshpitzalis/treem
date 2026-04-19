@@ -1,10 +1,10 @@
-import { createAuthorKey } from "../shared/leaderboard-query"
-import { scoreMessage } from "../shared/scoring"
+import { createAuthorKey } from "../../../../shared/leaderboard-query"
+import { scoreMessage } from "../../../../shared/scoring"
 import type {
   CommunityRef,
   ContributionMessage,
   ViewerProfile
-} from "../shared/types"
+} from "../../../../shared/types"
 
 const MESSAGE_SELECTOR = [
   'li[id^="chat-messages-"]',

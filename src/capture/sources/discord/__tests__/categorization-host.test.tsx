@@ -1,8 +1,8 @@
 import { JSDOM } from "jsdom"
 import { beforeEach, describe, expect, it } from "vitest"
-import type { LeaderboardState } from "../../shared/types"
-import { enhanceCategorizationControls } from "../categorization"
-import { resetCategoryControlDraftsForTests } from "../discord-categorization-control"
+import type { LeaderboardState } from "../../../../shared/types"
+import { enhanceCategorizationControls } from "../components/categorization"
+import { resetCategoryControlDraftsForTests } from "../components/categorization-control"
 
 describe("discord categorization host bridge", () => {
   beforeEach(() => {

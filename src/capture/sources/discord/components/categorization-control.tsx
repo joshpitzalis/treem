@@ -5,10 +5,10 @@ import {
   createCategoryAndAssign,
   listGuildCategories,
   UNCATEGORIZED_CATEGORY_ID
-} from "../shared/category-state"
-import { createCategoryPalette } from "../shared/category-palette"
-import type { LeaderboardState } from "../shared/types"
-import { BadgeButton } from "./badge"
+} from "../../../../shared/category-state"
+import { createCategoryPalette } from "../../../../shared/category-palette"
+import type { LeaderboardState } from "../../../../shared/types"
+import { BadgeButton } from "../../../components/badge"
 
 interface DiscordCategorizationControlProps {
   guildId: string
