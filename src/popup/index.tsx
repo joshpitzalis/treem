@@ -26,7 +26,7 @@ import {
   resolveChannelId,
   resolveScopeLabel
 } from "./helpers"
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 import { PopupStateService } from "./services/popup-state-service"
 import { LeaderboardStorage } from "./services/storage-service"
 
@@ -350,21 +350,20 @@ function PopupApp(input: {
   )
 }
 
+const popupStateLayer = PopupStateService.layer.pipe(
+  Layer.provide(LeaderboardStorage.layer)
+)
+
 function runPopupStateEffect<A>(
-  effect: Effect.Effect<A, never, PopupStateService | LeaderboardStorage>
+  effect: Effect.Effect<A, never, PopupStateService>
 ): Promise<A> {
-  return Effect.runPromise(
-    effect.pipe(
-      Effect.provide(PopupStateService.layer),
-      Effect.provide(LeaderboardStorage.layer)
-    )
-  )
+  return Effect.runPromise(effect.pipe(Effect.provide(popupStateLayer)))
 }
 
-function runPopupSyncEffect<A>(
-  effect: Effect.Effect<A, never, LeaderboardStorage>
+function runPopupStateSyncEffect<A>(
+  effect: Effect.Effect<A, never, PopupStateService>
 ): A {
-  return Effect.runSync(effect.pipe(Effect.provide(LeaderboardStorage.layer)))
+  return Effect.runSync(effect.pipe(Effect.provide(popupStateLayer)))
 }
 
 function createBrowserRuntime(): PopupRuntime {
@@ -392,10 +391,10 @@ function createBrowserRuntime(): PopupRuntime {
         })
       ),
     subscribeToLeaderboardStateChanges: (listener) =>
-      runPopupSyncEffect(
+      runPopupStateSyncEffect(
         Effect.gen(function* () {
-          const storage = yield* LeaderboardStorage
-          return yield* storage.subscribeToLeaderboardStateChanges(listener)
+          const popupState = yield* PopupStateService
+          return yield* popupState.subscribeToLeaderboardStateChanges(listener)
         })
       )
   }

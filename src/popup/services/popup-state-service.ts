@@ -38,7 +38,9 @@ export class PopupStateService extends Context.Service<PopupStateService>()(
             yield* storage.savePopupPreferences(
               toPopupPreferences(nextSelection)
             )
-          })
+          }),
+        subscribeToLeaderboardStateChanges: (listener: () => void) =>
+          storage.subscribeToLeaderboardStateChanges(listener)
       }
     })
   }
