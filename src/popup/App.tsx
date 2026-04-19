@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react"
-import { flushSync } from "react-dom"
-import { createRoot, type Root } from "react-dom/client"
 import "./lib/styles.css"
 import {
   filterMessagesByView,
@@ -14,62 +12,18 @@ import type {
   LeaderboardState,
   TimeRangeKey
 } from "../shared/types"
-import { ALL_CHANNELS_VALUE } from "./constants"
+import { ALL_CHANNELS_VALUE } from "./lib/constants"
 import type { PopupRuntime, PopupSelection, RefreshRequest } from "./types"
-import { AtomRegistryProvider } from "./lib/atom-registry-provider"
 import { ReadinessChip, LeaderboardSection, TreemapSection } from "./components"
 import {
   createEmptyReadinessStates,
-  ensurePopupMountNode,
   getScrollHint,
   mergeRefreshRequests,
   resolveChannelId,
   resolveScopeLabel
-} from "./helpers"
-import { Effect, Layer } from "effect"
-import { PopupStateService } from "./services/popup-state-service"
-import { LeaderboardStorage } from "./services/storage-service"
+} from "./lib/helpers"
 
-export let popupRuntime: PopupRuntime = createBrowserRuntime()
-export let popupRoot: Root | null = null
-export let popupMountNode: HTMLElement | null = null
-export let renderKey = 0
-
-export async function bootstrapPopup(
-  runtimeOverrides: Partial<PopupRuntime> = {}
-): Promise<void> {
-  popupRuntime = {
-    ...createBrowserRuntime(),
-    ...runtimeOverrides
-  }
-
-  const mountNode = ensurePopupMountNode(popupRuntime.document)
-  const initialModel = await popupRuntime.loadInitialPopupModel()
-  const initialState = initialModel.state
-  const initialSelection = initialModel.selection
-
-  if (!popupRoot || popupMountNode !== mountNode) {
-    popupRoot = createRoot(mountNode)
-    popupMountNode = mountNode
-  }
-
-  renderKey += 1
-
-  flushSync(() => {
-    popupRoot?.render(
-      <AtomRegistryProvider>
-      <PopupApp
-        key={renderKey}
-        runtime={popupRuntime}
-        initialState={initialState}
-        initialSelection={initialSelection}
-        />
-      </AtomRegistryProvider>
-    )
-  })
-}
-
-function PopupApp(input: {
+export function PopupApp(input: {
   runtime: PopupRuntime
   initialState: LeaderboardState
   initialSelection: PopupSelection
@@ -349,57 +303,3 @@ function PopupApp(input: {
     </main>
   )
 }
-
-const popupStateLayer = PopupStateService.layer.pipe(
-  Layer.provide(LeaderboardStorage.layer)
-)
-
-function runPopupStateEffect<A>(
-  effect: Effect.Effect<A, never, PopupStateService>
-): Promise<A> {
-  return Effect.runPromise(effect.pipe(Effect.provide(popupStateLayer)))
-}
-
-function runPopupStateSyncEffect<A>(
-  effect: Effect.Effect<A, never, PopupStateService>
-): A {
-  return Effect.runSync(effect.pipe(Effect.provide(popupStateLayer)))
-}
-
-function createBrowserRuntime(): PopupRuntime {
-  return {
-    document,
-    loadInitialPopupModel: () =>
-      runPopupStateEffect(
-        Effect.gen(function* () {
-          const popupState = yield* PopupStateService
-          return yield* popupState.loadInitialPopupModel()
-        })
-      ),
-    refreshPopupModel: (previousSelection) =>
-      runPopupStateEffect(
-        Effect.gen(function* () {
-          const popupState = yield* PopupStateService
-          return yield* popupState.refreshPopupModel(previousSelection)
-        })
-      ),
-    saveSelection: (selection) =>
-      runPopupStateEffect(
-        Effect.gen(function* () {
-          const popupState = yield* PopupStateService
-          return yield* popupState.saveSelection(selection)
-        })
-      ),
-    subscribeToLeaderboardStateChanges: (listener) =>
-      runPopupStateSyncEffect(
-        Effect.gen(function* () {
-          const popupState = yield* PopupStateService
-          return yield* popupState.subscribeToLeaderboardStateChanges(listener)
-        })
-      )
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  void bootstrapPopup()
-})

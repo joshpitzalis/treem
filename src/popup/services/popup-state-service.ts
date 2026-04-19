@@ -1,6 +1,9 @@
 import { Context, Effect, Layer } from "effect"
 import type { PopupPreferences } from "../../shared/types"
-import { resolveInitialSelection, resolvePreservedSelection } from "../helpers"
+import {
+  resolveInitialSelection,
+  resolvePreservedSelection
+} from "../lib/helpers"
 import type { PopupModel, PopupSelection } from "../types"
 import { LeaderboardStorage } from "./storage-service"
 

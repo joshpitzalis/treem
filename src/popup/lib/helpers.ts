@@ -1,10 +1,11 @@
-import { createCategoryPalette } from "../shared/category-palette"
+import { Effect, Layer } from "effect"
+import { createCategoryPalette } from "../../shared/category-palette"
 import {
   getScrollTargetDate,
   listChannels,
   listGuilds,
   summarizeCoverage
-} from "../shared/leaderboard-query"
+} from "../../shared/leaderboard-query"
 import type {
   ChannelOption,
   DataReadiness,
@@ -12,17 +13,20 @@ import type {
   LeaderboardState,
   TimeRangeKey,
   TreemapSummary
-} from "../shared/types"
-import { ALL_CHANNELS_VALUE } from "./constants"
+} from "../../shared/types"
+import { PopupStateService } from "../services/popup-state-service"
+import { LeaderboardStorage } from "../services/storage-service"
 import type {
   PopupSelection,
   RefreshRequest,
   TreemapRect,
   TreemapTileDensity
-} from "./types"
-
-const MIN_PROCESSING_MS = 600
-const TREEMAP_LAYOUT_SCALE = 100
+} from "../types"
+import {
+  ALL_CHANNELS_VALUE,
+  MIN_PROCESSING_MS,
+  TREEMAP_LAYOUT_SCALE
+} from "./constants"
 
 export function ensurePopupMountNode(document: Document): HTMLElement {
   const existingRoot = document.querySelector<HTMLElement>("#popup-root")
@@ -359,4 +363,22 @@ export function formatPercentage(percentage: number): string {
   return Number.isInteger(percentage)
     ? `${percentage}%`
     : `${percentage.toFixed(1)}%`
+}
+
+// --- Effect helpers---
+
+const popupStateLayer = PopupStateService.layer.pipe(
+  Layer.provide(LeaderboardStorage.layer)
+)
+
+export function runPopupStateEffect<A>(
+  effect: Effect.Effect<A, never, PopupStateService>
+): Promise<A> {
+  return Effect.runPromise(effect.pipe(Effect.provide(popupStateLayer)))
+}
+
+export function runPopupStateSyncEffect<A>(
+  effect: Effect.Effect<A, never, PopupStateService>
+): A {
+  return Effect.runSync(effect.pipe(Effect.provide(popupStateLayer)))
 }

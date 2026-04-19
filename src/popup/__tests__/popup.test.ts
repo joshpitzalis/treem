@@ -3,7 +3,10 @@ import { JSDOM } from "jsdom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { LeaderboardState } from "../../shared/types"
-import { resolveInitialSelection, resolvePreservedSelection } from "../helpers"
+import {
+  resolveInitialSelection,
+  resolvePreservedSelection
+} from "../lib/helpers"
 import type { PopupSelection } from "../types"
 
 describe("popup React app", () => {
@@ -500,7 +503,7 @@ async function loadPopupModule(window: {
     window
   })
 
-  return await import("..")
+  return await import("../runTime")
 }
 
 function createPopupDom() {
