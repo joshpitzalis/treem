@@ -2,8 +2,9 @@ import { cleanup, fireEvent, waitFor, within } from "@testing-library/react"
 import { JSDOM } from "jsdom"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import type { LeaderboardState, PopupPreferences } from "../../shared/types"
+import type { LeaderboardState } from "../../shared/types"
 import { resolveInitialSelection, resolvePreservedSelection } from "../helpers"
+import type { PopupSelection } from "../types"
 
 describe("popup React app", () => {
   beforeEach(() => {
@@ -23,7 +24,7 @@ describe("popup React app", () => {
 
   it("mounts popup shell through React and keeps leaderboard and treemap on same scope", async () => {
     const { window } = createPopupDom()
-    const savedPreferences: PopupPreferences[] = []
+    const savedSelections: PopupSelection[] = []
 
     const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
@@ -31,9 +32,8 @@ describe("popup React app", () => {
       loadInitialPopupModel: async () => createPopupModel(createState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(createState(), previousSelection),
-      loadState: async () => createState(),
-      savePopupPreferences: async (preferences) => {
-        savedPreferences.push(preferences)
+      saveSelection: async (selection) => {
+        savedSelections.push(selection)
       },
       subscribeToLeaderboardStateChanges: () => () => {}
     })
@@ -89,7 +89,7 @@ describe("popup React app", () => {
     expect(
       window.document.querySelector("#status")?.textContent ?? ""
     ).not.toMatch(/Processing/)
-    expect(savedPreferences).toHaveLength(2)
+    expect(savedSelections).toHaveLength(2)
   })
 
   it("renders mixed named categories plus uncategorized and omits empty categories per time slice", async () => {
@@ -105,8 +105,7 @@ describe("popup React app", () => {
           createMixedCompositionState(),
           previousSelection
         ),
-      loadState: async () => createMixedCompositionState(),
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
     })
 
@@ -158,8 +157,7 @@ describe("popup React app", () => {
       loadInitialPopupModel: async () => createPopupModel(createState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(createState(), previousSelection),
-      loadState: async () => createState(),
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
     })
 
@@ -185,8 +183,7 @@ describe("popup React app", () => {
       loadInitialPopupModel: async () => createPopupModel(createState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(createState(), previousSelection),
-      loadState: async () => createState(),
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
     })
 
@@ -265,35 +262,7 @@ describe("popup React app", () => {
           },
           previousSelection
         ),
-      loadState: async () => ({
-        ...createState(),
-        messages: [
-          ...createState().messages,
-          {
-            ...createMessage({
-              id: "reply-1",
-              guildId: "guild-1",
-              guildName: "Guild One",
-              channelId: "channel-1",
-              channelName: "alpha",
-              authorKey: "reply-author",
-              authorName: "Reply Author",
-              messageTimestamp: "2026-04-17T08:00:00.000Z"
-            }),
-            isReply: true
-          }
-        ],
-        messageCategoryAssignments: [
-          ...createState().messageCategoryAssignments,
-          {
-            messageId: "reply-1",
-            guildId: "guild-1",
-            categoryId: "cat-feature",
-            assignedAt: "2026-04-17T08:05:00.000Z"
-          }
-        ]
-      }),
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
     })
 
@@ -314,8 +283,7 @@ describe("popup React app", () => {
       loadInitialPopupModel: async () => createPopupModel(createState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(createState(), previousSelection),
-      loadState: async () => createState(),
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
     })
 
@@ -346,8 +314,7 @@ describe("popup React app", () => {
       loadInitialPopupModel: async () => createPopupModel(createEmptyState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(createEmptyState(), previousSelection),
-      loadState: async () => createEmptyState(),
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
     })
 
@@ -371,8 +338,7 @@ describe("popup React app", () => {
         createPopupModel(createPastOnlyState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(createPastOnlyState(), previousSelection),
-      loadState: async () => createPastOnlyState(),
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: () => () => {}
     })
 
@@ -423,8 +389,7 @@ describe("popup React app", () => {
       loadInitialPopupModel: async () => createPopupModel(await loadState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(await loadState(), previousSelection),
-      loadState,
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: (listener) => {
         storageListenerRegistered = true
         stateChangeListener = listener
@@ -498,8 +463,7 @@ describe("popup React app", () => {
       loadInitialPopupModel: async () => createPopupModel(await loadState()),
       refreshPopupModel: async (previousSelection) =>
         createRefreshedPopupModel(await loadState(), previousSelection),
-      loadState,
-      savePopupPreferences: async () => {},
+      saveSelection: async () => {},
       subscribeToLeaderboardStateChanges: (listener) => {
         stateChangeListener = listener
         return () => {}

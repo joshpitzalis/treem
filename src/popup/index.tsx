@@ -189,8 +189,7 @@ function PopupApp(input: {
 
   async function handleGuildChange(nextGuildId: string) {
     const preferredChannelId =
-      currentStateRef.current.popupPreferences?.selectedChannelId ??
-      ALL_CHANNELS_VALUE
+      selectionRef.current.channelId ?? ALL_CHANNELS_VALUE
     const nextChannels = listChannels(currentStateRef.current.messages, nextGuildId)
     const nextChannelId = resolveChannelId(preferredChannelId, nextChannels)
     const nextSelection = {
@@ -226,22 +225,7 @@ function PopupApp(input: {
   async function persistPopupPreferences(
     nextSelection: PopupSelection
   ): Promise<void> {
-    if (!nextSelection.guildId) return
-
-    await input.runtime.savePopupPreferences({
-      selectedGuildId: nextSelection.guildId,
-      selectedChannelId: nextSelection.channelId,
-      selectedTimeRange: nextSelection.timeRange
-    })
-
-    setCurrentState((previousState) => ({
-      ...previousState,
-      popupPreferences: {
-        selectedGuildId: nextSelection.guildId,
-        selectedChannelId: nextSelection.channelId,
-        selectedTimeRange: nextSelection.timeRange
-      }
-    }))
+    await input.runtime.saveSelection(nextSelection)
   }
 
   return (
@@ -366,14 +350,6 @@ function PopupApp(input: {
   )
 }
 
-function runPopupEffect<A>(
-  effect: Effect.Effect<A, never, LeaderboardStorage>
-): Promise<A> {
-  return Effect.runPromise(
-    effect.pipe(Effect.provide(LeaderboardStorage.layer))
-  )
-}
-
 function runPopupStateEffect<A>(
   effect: Effect.Effect<A, never, PopupStateService | LeaderboardStorage>
 ): Promise<A> {
@@ -408,18 +384,11 @@ function createBrowserRuntime(): PopupRuntime {
           return yield* popupState.refreshPopupModel(previousSelection)
         })
       ),
-    loadState: () =>
-      runPopupEffect(
+    saveSelection: (selection) =>
+      runPopupStateEffect(
         Effect.gen(function* () {
-          const storage = yield* LeaderboardStorage
-          return yield* storage.loadState()
-        })
-      ),
-    savePopupPreferences: (preferences) =>
-      runPopupEffect(
-        Effect.gen(function* () {
-          const storage = yield* LeaderboardStorage
-          return yield* storage.savePopupPreferences(preferences)
+          const popupState = yield* PopupStateService
+          return yield* popupState.saveSelection(selection)
         })
       ),
     subscribeToLeaderboardStateChanges: (listener) =>
