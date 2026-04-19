@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from "effect"
-import { resolveInitialSelection } from "../helpers"
-import type { InitialPopupModel } from "../types"
+import { resolveInitialSelection, resolvePreservedSelection } from "../helpers"
+import type { PopupModel, PopupSelection } from "../types"
 import { LeaderboardStorage } from "./storage-service"
 
 export class PopupStateService extends Context.Service<PopupStateService>()(
@@ -10,13 +10,24 @@ export class PopupStateService extends Context.Service<PopupStateService>()(
       const storage = yield* LeaderboardStorage
 
       return {
-        loadInitialPopupModel: (): Effect.Effect<InitialPopupModel> =>
+        loadInitialPopupModel: (): Effect.Effect<PopupModel> =>
           Effect.gen(function* () {
             const state = yield* storage.loadState()
 
             return {
               state,
               selection: resolveInitialSelection(state)
+            }
+          }),
+        refreshPopupModel: (
+          previousSelection: PopupSelection
+        ): Effect.Effect<PopupModel> =>
+          Effect.gen(function* () {
+            const state = yield* storage.loadState()
+
+            return {
+              state,
+              selection: resolvePreservedSelection(state, previousSelection)
             }
           })
       }

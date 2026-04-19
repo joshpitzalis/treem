@@ -24,8 +24,6 @@ import {
   getScrollHint,
   mergeRefreshRequests,
   resolveChannelId,
-  resolveInitialSelection,
-  resolvePreservedSelection,
   resolveScopeLabel
 } from "./helpers"
 import { Effect } from "effect"
@@ -181,14 +179,12 @@ function PopupApp(input: {
   }
 
   async function runRefresh(_request: RefreshRequest): Promise<void> {
-    const nextState = await input.runtime.loadState()
-    const nextSelection = resolvePreservedSelection(
-      nextState,
+    const nextModel = await input.runtime.refreshPopupModel(
       selectionRef.current
     )
 
-    setCurrentState(nextState)
-    setSelection(nextSelection)
+    setCurrentState(nextModel.state)
+    setSelection(nextModel.selection)
   }
 
   async function handleGuildChange(nextGuildId: string) {
@@ -403,6 +399,13 @@ function createBrowserRuntime(): PopupRuntime {
         Effect.gen(function* () {
           const popupState = yield* PopupStateService
           return yield* popupState.loadInitialPopupModel()
+        })
+      ),
+    refreshPopupModel: (previousSelection) =>
+      runPopupStateEffect(
+        Effect.gen(function* () {
+          const popupState = yield* PopupStateService
+          return yield* popupState.refreshPopupModel(previousSelection)
         })
       ),
     loadState: () =>

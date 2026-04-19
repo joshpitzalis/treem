@@ -10,14 +10,15 @@ export interface PopupSelection {
   timeRange: TimeRangeKey
 }
 
-export interface InitialPopupModel {
+export interface PopupModel {
   state: LeaderboardState
   selection: PopupSelection
 }
 
 export interface PopupRuntime {
   document: Document
-  loadInitialPopupModel: () => Promise<InitialPopupModel>
+  loadInitialPopupModel: () => Promise<PopupModel>
+  refreshPopupModel: (previousSelection: PopupSelection) => Promise<PopupModel>
   loadState: () => Promise<LeaderboardState>
   savePopupPreferences: (preferences: PopupPreferences) => Promise<void>
   subscribeToLeaderboardStateChanges: (listener: () => void) => () => void
