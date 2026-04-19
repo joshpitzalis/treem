@@ -1,40 +1,30 @@
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react"
 import { JSDOM } from "jsdom"
-import { describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import type { LeaderboardState, PopupPreferences } from "../../shared/types"
 
-describe("popup treemap baseline", () => {
-  it("keeps leaderboard and treemap on same scope and time range", async () => {
-    const dom = new JSDOM(
-      `
-        <main class="app-shell">
-          <section class="controls">
-            <button id="score-info-toggle" type="button"></button>
-            <select id="guild-select"></select>
-            <select id="channel-select"></select>
-            <div id="readiness-strip"></div>
-            <div id="score-info" hidden></div>
-            <p id="sync-status" hidden></p>
-            <p id="status"></p>
-          </section>
-          <section id="leaderboard"></section>
-          <section id="treemap"></section>
-        </main>
-      `,
-      {
-        url: "https://example.test"
-      }
+describe("popup React app", () => {
+  beforeEach(() => {
+    vi.resetModules()
+    vi.spyOn(Date, "now").mockReturnValue(
+      new Date("2026-04-17T08:30:00.000Z").getTime()
     )
+    delete (globalThis as Partial<typeof globalThis>).document
+    delete (globalThis as Partial<typeof globalThis>).window
+    delete (globalThis as Partial<typeof globalThis>).navigator
+  })
 
-    const { window } = dom
+  afterEach(() => {
+    cleanup()
+    vi.restoreAllMocks()
+  })
+
+  it("mounts popup shell through React and keeps leaderboard and treemap on same scope", async () => {
+    const { window } = createPopupDom()
     const savedPreferences: PopupPreferences[] = []
 
-    Object.assign(globalThis, {
-      document: window.document,
-      window
-    })
-
-    const popupModule = await import("../popup")
+    const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
       loadState: async () => createState(),
@@ -44,97 +34,64 @@ describe("popup treemap baseline", () => {
       addStorageChangeListener: () => {}
     })
 
-    expect(
-      window.document.querySelector("#leaderboard")?.textContent ?? ""
-    ).toMatch(/Guild One/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Guild One/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Bug/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/2 messages/)
-
-    const channelSelect =
-      window.document.querySelector<HTMLSelectElement>("#channel-select")
-    if (!channelSelect) {
-      throw new Error("Expected channel select")
-    }
-
-    channelSelect.value = "channel-1"
-    channelSelect.dispatchEvent(new window.Event("change"))
+    const page = within(window.document.body)
 
     expect(
-      window.document.querySelector("#leaderboard")?.textContent ?? ""
-    ).toMatch(/Guild One \/ #alpha/)
+      page.getByRole("heading", { name: "Contributions Leaderboard" })
+    ).toBeTruthy()
     expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Guild One \/ #alpha/)
+      page.getByRole("heading", { name: "Discord Contributions Leaderboard" })
+    ).toBeTruthy()
     expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Feature/)
+      page.getByRole("heading", { name: "Category Composition" })
+    ).toBeTruthy()
 
-    const firstDayTab = window.document.querySelector<HTMLButtonElement>(
-      '.time-tab[data-range="24h"]'
-    )
-    if (!firstDayTab) {
-      throw new Error("Expected 24h time tab")
-    }
-    firstDayTab.click()
+    const channelSelect = page.getByLabelText("Channel")
 
     expect(
-      window.document.querySelector("#leaderboard")?.textContent ?? ""
-    ).toMatch(/Alice/)
+      within(page.getByTestId("leaderboard")).getByText(/Guild One/)
+    ).toBeTruthy()
     expect(
-      window.document.querySelector("#leaderboard")?.textContent ?? ""
-    ).not.toMatch(/Bob/)
+      within(page.getByTestId("treemap")).getByText(/Guild One/)
+    ).toBeTruthy()
+    expect(within(page.getByTestId("treemap")).getByText(/Bug/)).toBeTruthy()
     expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Bug/)
+      within(page.getByTestId("treemap")).getByText(/2 messages/)
+    ).toBeTruthy()
+
+    fireEvent.change(channelSelect, { target: { value: "channel-1" } })
+
     expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/100%/)
+      within(page.getByTestId("leaderboard")).getByText(/Guild One \/ #alpha/)
+    ).toBeTruthy()
     expect(
-      window.document.querySelector("#sync-status")?.textContent ?? ""
-    ).toBe("")
+      within(page.getByTestId("treemap")).getByText(/Guild One \/ #alpha/)
+    ).toBeTruthy()
+    expect(
+      within(page.getByTestId("treemap")).getByText(/Feature/)
+    ).toBeTruthy()
+
+    fireEvent.click(page.getByRole("button", { name: "24h" }))
+
+    expect(
+      within(page.getByTestId("leaderboard")).getByText(/Alice/)
+    ).toBeTruthy()
+    expect(
+      within(page.getByTestId("leaderboard")).queryByText(/Bob/)
+    ).toBeNull()
+    expect(within(page.getByTestId("treemap")).getByText(/Bug/)).toBeTruthy()
+    expect(within(page.getByTestId("treemap")).getByText(/100%/)).toBeTruthy()
+    expect(window.document.querySelector("#sync-status")).toBeNull()
     expect(
       window.document.querySelector("#status")?.textContent ?? ""
     ).not.toMatch(/Processing/)
-    expect(savedPreferences.length).toBe(2)
+    expect(savedPreferences).toHaveLength(2)
   })
 
   it("renders mixed named categories plus uncategorized and omits empty categories per time slice", async () => {
-    const dom = new JSDOM(
-      `
-        <main class="app-shell">
-          <section class="controls">
-            <button id="score-info-toggle" type="button"></button>
-            <select id="guild-select"></select>
-            <select id="channel-select"></select>
-            <div id="readiness-strip"></div>
-            <div id="score-info" hidden></div>
-            <p id="sync-status" hidden></p>
-            <p id="status"></p>
-          </section>
-          <section id="leaderboard"></section>
-          <section id="treemap"></section>
-        </main>
-      `,
-      {
-        url: "https://example.test"
-      }
-    )
+    const { window } = createPopupDom()
 
-    const { window } = dom
-
-    Object.assign(globalThis, {
-      document: window.document,
-      window
-    })
-
-    const popupModule = await import("../popup")
+    const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
       loadState: async () => createMixedCompositionState(),
@@ -142,87 +99,49 @@ describe("popup treemap baseline", () => {
       addStorageChangeListener: () => {}
     })
 
+    const page = within(window.document.body)
+
     expect(readTreemapTileLabels(window.document)).toEqual([
       "Bug",
       "Uncategorized",
       "Feature"
     ])
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Bug[\s\S]*2 messages[\s\S]*40% of slice/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Uncategorized[\s\S]*2 messages[\s\S]*40% of slice/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).not.toMatch(/Empty/)
-
-    const range7d = window.document.querySelector<HTMLButtonElement>(
-      '.time-tab[data-range="7d"]'
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /Bug[\s\S]*2 messages[\s\S]*40% of slice/
     )
-    if (!range7d) {
-      throw new Error("Expected 7d time tab")
-    }
-    range7d.click()
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /Uncategorized[\s\S]*2 messages[\s\S]*40% of slice/
+    )
+    expect(page.getByTestId("treemap").textContent ?? "").not.toMatch(/Empty/)
+
+    fireEvent.click(page.getByRole("button", { name: "7d" }))
 
     expect(readTreemapTileLabels(window.document)).toEqual(["Bug", "Feature"])
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Bug[\s\S]*2 messages[\s\S]*66.7% of slice/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Feature[\s\S]*1 messages[\s\S]*33.3% of slice/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).not.toMatch(/Uncategorized/)
-
-    const range24h = window.document.querySelector<HTMLButtonElement>(
-      '.time-tab[data-range="24h"]'
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /Bug[\s\S]*2 messages[\s\S]*66.7% of slice/
     )
-    if (!range24h) {
-      throw new Error("Expected 24h time tab")
-    }
-    range24h.click()
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /Feature[\s\S]*1 messages[\s\S]*33.3% of slice/
+    )
+    expect(page.getByTestId("treemap").textContent ?? "").not.toMatch(
+      /Uncategorized/
+    )
+
+    fireEvent.click(page.getByRole("button", { name: "24h" }))
 
     expect(readTreemapTileLabels(window.document)).toEqual(["Bug"])
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Bug[\s\S]*2 messages[\s\S]*100% of slice/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).not.toMatch(/Feature|Uncategorized|Empty/)
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /Bug[\s\S]*2 messages[\s\S]*100% of slice/
+    )
+    expect(page.getByTestId("treemap").textContent ?? "").not.toMatch(
+      /Feature|Uncategorized|Empty/
+    )
   })
 
   it("sizes treemap tiles by message count", async () => {
-    const dom = new JSDOM(
-      `
-        <main class="app-shell">
-          <section class="controls">
-            <button id="score-info-toggle" type="button"></button>
-            <select id="guild-select"></select>
-            <select id="channel-select"></select>
-            <div id="readiness-strip"></div>
-            <div id="score-info" hidden></div>
-            <p id="sync-status" hidden></p>
-            <p id="status"></p>
-          </section>
-          <section id="leaderboard"></section>
-          <section id="treemap"></section>
-        </main>
-      `,
-      {
-        url: "https://example.test"
-      }
-    )
+    const { window } = createPopupDom()
 
-    const { window } = dom
-
-    Object.assign(globalThis, {
-      document: window.document,
-      window
-    })
-
-    const popupModule = await import("../popup")
+    const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
       loadState: async () => createState(),
@@ -243,29 +162,145 @@ describe("popup treemap baseline", () => {
     )
   })
 
-  it("applies the latest storage change after an in-flight refresh", async () => {
-    const dom = new JSDOM(
-      `
-        <main class="app-shell">
-          <section class="controls">
-            <button id="score-info-toggle" type="button"></button>
-            <select id="guild-select"></select>
-            <select id="channel-select"></select>
-            <div id="readiness-strip"></div>
-            <div id="score-info" hidden></div>
-            <p id="sync-status" hidden></p>
-            <p id="status"></p>
-          </section>
-          <section id="leaderboard"></section>
-          <section id="treemap"></section>
-        </main>
-      `,
-      {
-        url: "https://example.test"
-      }
+  it("applies treemap tile classes so category tiles render with treemap styling", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    const bugTile = window.document.querySelector<HTMLElement>(
+      '[data-tile-id="cat-bug"]'
     )
 
-    const { window } = dom
+    expect(bugTile?.className).toContain("treemap-tile")
+    expect(bugTile?.className).toContain("is-large")
+  })
+
+  it("excludes reply messages from popup treemap composition", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => ({
+        ...createState(),
+        messages: [
+          ...createState().messages,
+          {
+            ...createMessage({
+              id: "reply-1",
+              guildId: "guild-1",
+              guildName: "Guild One",
+              channelId: "channel-1",
+              channelName: "alpha",
+              authorKey: "reply-author",
+              authorName: "Reply Author",
+              messageTimestamp: "2026-04-17T08:00:00.000Z"
+            }),
+            isReply: true
+          }
+        ],
+        messageCategoryAssignments: [
+          ...createState().messageCategoryAssignments,
+          {
+            messageId: "reply-1",
+            guildId: "guild-1",
+            categoryId: "cat-feature",
+            assignedAt: "2026-04-17T08:05:00.000Z"
+          }
+        ]
+      }),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    const treemapText =
+      within(window.document.body).getByTestId("treemap").textContent ?? ""
+
+    expect(treemapText).toMatch(/Feature[\s\S]*1 messages/)
+    expect(treemapText).not.toMatch(/Feature[\s\S]*2 messages/)
+    expect(treemapText).not.toMatch(/20% of slice/)
+  })
+
+  it("applies distinct palette variables across treemap tiles", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    const bugTile = window.document.querySelector<HTMLElement>(
+      '[data-tile-id="cat-bug"]'
+    )
+    const featureTile = window.document.querySelector<HTMLElement>(
+      '[data-tile-id="cat-feature"]'
+    )
+
+    expect(bugTile?.getAttribute("style") ?? "").toContain(
+      "--treemap-fill-start"
+    )
+    expect(featureTile?.getAttribute("style") ?? "").toContain(
+      "--treemap-fill-start"
+    )
+    expect(bugTile?.getAttribute("style")).not.toBe(
+      featureTile?.getAttribute("style")
+    )
+  })
+
+  it("renders no-server and slice-empty states with popup parity copy", async () => {
+    const { window } = createPopupDom()
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createEmptyState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    let page = within(window.document.body)
+
+    expect(page.getByLabelText("Server")).toHaveProperty("disabled", true)
+    expect(page.getByLabelText("Channel")).toHaveProperty("disabled", true)
+    expect(page.getByTestId("leaderboard").textContent ?? "").toMatch(
+      /No contributors captured yet\./
+    )
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /No server selected yet[\s\S]*Capture Discord messages to see category composition\./
+    )
+    expect(window.document.querySelector("#status")?.textContent ?? "").toBe(
+      "Open Discord in Chrome and browse a server to start collecting data."
+    )
+
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => createPastOnlyState(),
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: () => {}
+    })
+
+    page = within(window.document.body)
+    fireEvent.click(page.getByRole("button", { name: "24h" }))
+
+    expect(page.getByTestId("leaderboard").textContent ?? "").toMatch(
+      /No contributors captured for this slice yet\./
+    )
+    expect(page.getByTestId("treemap").textContent ?? "").toMatch(
+      /No captured messages in this slice yet\./
+    )
+  })
+
+  it("applies latest storage change after in-flight refresh", async () => {
+    const { window } = createPopupDom()
     const originalSetTimeout = window.setTimeout.bind(window)
     let storageListenerRegistered = false
     let storageListener = (
@@ -285,12 +320,7 @@ describe("popup treemap baseline", () => {
       return 0
     }) as typeof window.setTimeout
 
-    Object.assign(globalThis, {
-      document: window.document,
-      window
-    })
-
-    const popupModule = await import("../popup")
+    const popupModule = await loadPopupModule(window)
     await popupModule.bootstrapPopup({
       document: window.document,
       loadState: async () => {
@@ -312,9 +342,9 @@ describe("popup treemap baseline", () => {
       }
     })
 
-    if (!storageListenerRegistered) {
-      throw new Error("Expected storage listener")
-    }
+    const page = within(window.document.body)
+
+    expect(storageListenerRegistered).toBe(true)
 
     storageListener({ discordLeaderboardState: {} }, "local")
 
@@ -344,23 +374,91 @@ describe("popup treemap baseline", () => {
     }
 
     storageListener({ discordLeaderboardState: {} }, "local")
-    if (!blockedLoadResolverRegistered) {
-      throw new Error("Expected blocked load resolver")
-    }
+    expect(blockedLoadResolverRegistered).toBe(true)
     resolveBlockedLoad(createState())
     await new Promise((resolve) => originalSetTimeout(resolve, 0))
 
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).toMatch(/Docs/)
-    expect(
-      window.document.querySelector("#treemap")?.textContent ?? ""
-    ).not.toMatch(/Feature/)
-    expect(
-      window.document.querySelector("#sync-status")?.textContent ?? ""
-    ).toBe("")
+    await waitFor(() => {
+      expect(page.getByTestId("treemap").textContent ?? "").toMatch(/Docs/)
+    })
+    expect(page.getByTestId("treemap").textContent ?? "").not.toMatch(/Feature/)
+    expect(window.document.querySelector("#sync-status")).toBeNull()
+  })
+
+  it("refreshes popup state without rendering a sync status line", async () => {
+    const { window } = createPopupDom()
+    let storageListener = (
+      _changes: Record<string, unknown>,
+      _areaName: string
+    ) => {}
+    let loadStateCallCount = 0
+    let resolveBlockedLoadState = (_state: LeaderboardState) => {}
+
+    const popupModule = await loadPopupModule(window)
+    await popupModule.bootstrapPopup({
+      document: window.document,
+      loadState: async () => {
+        loadStateCallCount += 1
+
+        if (loadStateCallCount === 1) {
+          return createState()
+        }
+
+        return await new Promise<LeaderboardState>((resolve) => {
+          resolveBlockedLoadState = resolve
+        })
+      },
+      savePopupPreferences: async () => {},
+      addStorageChangeListener: (listener) => {
+        storageListener = listener
+      }
+    })
+
+    storageListener({ discordLeaderboardState: {} }, "local")
+
+    await waitFor(() => {
+      expect(window.document.querySelector("#sync-status")).toBeNull()
+      expect(
+        window.document.querySelector("#status")?.textContent ?? ""
+      ).not.toBe("")
+    })
+
+    resolveBlockedLoadState(createState())
+
+    await waitFor(() => {
+      expect(window.document.querySelector("#sync-status")).toBeNull()
+      expect(
+        window.document.querySelector("#status")?.textContent ?? ""
+      ).not.toBe("")
+    })
   })
 })
+
+async function loadPopupModule(window: {
+  document: Document
+  navigator: Navigator
+}) {
+  Object.assign(globalThis, {
+    document: window.document,
+    navigator: window.navigator,
+    window
+  })
+
+  return await import("..")
+}
+
+function createPopupDom() {
+  return new JSDOM(
+    `
+      <body>
+        <div id="popup-root"></div>
+      </body>
+    `,
+    {
+      url: "https://example.test"
+    }
+  )
+}
 
 function createState(): LeaderboardState {
   return {
@@ -585,6 +683,54 @@ function createMixedCompositionState(): LeaderboardState {
   }
 }
 
+function createEmptyState(): LeaderboardState {
+  return {
+    messages: [],
+    viewerProfile: null,
+    scopeObservations: [],
+    popupPreferences: null,
+    categories: [],
+    messageCategoryAssignments: [],
+    updatedAt: null
+  }
+}
+
+function createPastOnlyState(): LeaderboardState {
+  return {
+    ...createState(),
+    messages: [
+      createMessage({
+        id: "old-1",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-1",
+        channelName: "alpha",
+        authorKey: "alice",
+        authorName: "Alice",
+        messageTimestamp: "2026-04-10T10:00:00.000Z"
+      }),
+      createMessage({
+        id: "old-2",
+        guildId: "guild-1",
+        guildName: "Guild One",
+        channelId: "channel-2",
+        channelName: "beta",
+        authorKey: "bob",
+        authorName: "Bob",
+        messageTimestamp: "2026-04-09T10:00:00.000Z"
+      })
+    ],
+    messageCategoryAssignments: [
+      {
+        messageId: "old-1",
+        guildId: "guild-1",
+        categoryId: "cat-bug",
+        assignedAt: "2026-04-10T10:05:00.000Z"
+      }
+    ]
+  }
+}
+
 function readTreemapTileLabels(document: Document): string[] {
   return Array.from(
     document.querySelectorAll<HTMLElement>(".treemap-tile-name")
@@ -593,22 +739,15 @@ function readTreemapTileLabels(document: Document): string[] {
 
 function readTreemapTileArea(document: Document, tileId: string): number {
   const tile = document.querySelector<HTMLElement>(`[data-tile-id="${tileId}"]`)
-  if (!tile) {
-    throw new Error(`Expected treemap tile ${tileId}`)
-  }
+  if (!tile) throw new Error(`Expected treemap tile ${tileId}`)
 
   const style = tile.getAttribute("style") ?? ""
-  const width = readStylePercentage(style, "width")
-  const height = readStylePercentage(style, "height")
+  const width = Number.parseFloat(
+    style.match(/width:\s*([0-9.]+)%/)?.[1] ?? "0"
+  )
+  const height = Number.parseFloat(
+    style.match(/height:\s*([0-9.]+)%/)?.[1] ?? "0"
+  )
 
   return width * height
-}
-
-function readStylePercentage(style: string, property: string): number {
-  const match = style.match(new RegExp(`${property}:([0-9.]+)%`))
-  if (!match) {
-    throw new Error(`Expected ${property} in style: ${style}`)
-  }
-
-  return Number(match[1])
 }

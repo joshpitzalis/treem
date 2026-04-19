@@ -1,0 +1,21 @@
+{
+  "format_on_save": "on",
+  "formatter": [
+    {
+      "language_server": { "name": "biome" }
+    }
+  ],
+  "code_actions_on_format": {
+    "source.fixAll.biome": true,
+    "source.organizeImports.biome": true
+  },
+  "lsp": {
+    "vscode-css-language-server": {
+      "settings": {
+        "css": { "lint": { "unknownAtRules": "ignore" } },
+        "scss": { "lint": { "unknownAtRules": "ignore" } },
+        "less": { "lint": { "unknownAtRules": "ignore" } }
+      }
+    }
+  }
+}

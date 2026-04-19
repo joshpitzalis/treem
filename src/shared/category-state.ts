@@ -188,7 +188,7 @@ function assertMessageCanBeCategorized(
   messageId: string
 ): void {
   const message = assertMessageInGuild(state, guildId, messageId)
-  if (message.isReply) {
+  if (message.isReply !== false) {
     throw new Error("Only top-level messages can be categorized")
   }
 }

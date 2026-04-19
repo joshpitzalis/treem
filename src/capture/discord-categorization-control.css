@@ -1,0 +1,84 @@
+@import "tailwindcss";
+@source "./discord-categorization-control.tsx";
+
+@layer base {
+  :host {
+    position: static;
+    display: inline-flex;
+    margin-inline-start: 12px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+    vertical-align: middle;
+  }
+}
+
+@layer components {
+  .treem-category-row:hover [data-treem-role="category-control-host"],
+  .treem-category-row:focus-within [data-treem-role="category-control-host"],
+  [data-treem-role="category-control-host"]:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@layer components {
+  .treem-category-control {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap;
+  }
+
+  .treem-badge {
+    font: inherit;
+  }
+
+  .treem-badge--default {
+    @apply border-white/20 bg-[rgba(88,101,242,0.18)] text-white;
+  }
+
+  .treem-badge--secondary {
+    @apply border-white/15 bg-white/8 text-white/92;
+  }
+
+  .treem-badge--outline {
+    @apply border-white/25 bg-transparent text-white/92;
+  }
+
+  .treem-badge--ghost {
+    @apply border-transparent bg-transparent text-white/80;
+  }
+
+  .treem-category-picker,
+  .treem-category-create-form {
+    @apply inline-flex items-center gap-1.5;
+  }
+
+  .treem-category-picker {
+    @apply flex-wrap;
+  }
+
+  .treem-category-select,
+  .treem-category-create-input {
+    @apply min-w-[120px] rounded-full border border-white/25 text-[12px] text-inherit;
+    font: inherit;
+  }
+
+  .treem-category-toggle {
+    @apply min-w-[120px] cursor-pointer;
+  }
+
+  .treem-category-select {
+    @apply bg-black/20 px-2.5 py-0.5;
+  }
+
+  .treem-category-create-toggle {
+    @apply min-w-[72px] cursor-pointer;
+  }
+
+  .treem-category-create-input {
+    @apply min-w-[140px] bg-black/20 px-2.5 py-0.5;
+  }
+
+  .treem-category-create-error {
+    @apply m-0 text-xs text-[#ffb3ba];
+  }
+}
