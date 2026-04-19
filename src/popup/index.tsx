@@ -96,8 +96,6 @@ function PopupApp(input: {
     selectionRef.current = selection
   }, [selection])
 
-
-
   useEffect(() => {
     return input.runtime.subscribeToLeaderboardStateChanges(() => {
       void requestRefresh({ showLoading: true })
@@ -383,6 +381,12 @@ function runPopupEffect<A>(
   )
 }
 
+function runPopupSyncEffect<A>(
+  effect: Effect.Effect<A, never, LeaderboardStorage>
+): A {
+  return Effect.runSync(effect.pipe(Effect.provide(LeaderboardStorage.layer)))
+}
+
 function createBrowserRuntime(): PopupRuntime {
   return {
     document,
@@ -400,21 +404,13 @@ function createBrowserRuntime(): PopupRuntime {
           return yield* storage.savePopupPreferences(preferences)
         })
       ),
-    subscribeToLeaderboardStateChanges: (listener) => {
-      const handleChange = (
-        changes: Record<string, unknown>,
-        areaName: string
-      ) => {
-        if (areaName !== "local") return
-        if (!("discordLeaderboardState" in changes)) return
-        listener()
-      }
-
-      chrome.storage.onChanged.addListener(handleChange)
-      return () => {
-        chrome.storage.onChanged.removeListener(handleChange)
-      }
-    }
+    subscribeToLeaderboardStateChanges: (listener) =>
+      runPopupSyncEffect(
+        Effect.gen(function* () {
+          const storage = yield* LeaderboardStorage
+          return yield* storage.subscribeToLeaderboardStateChanges(listener)
+        })
+      )
   }
 }
 
