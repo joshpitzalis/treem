@@ -1,10 +1,13 @@
-import type { loadState, savePopupPreferences } from "../shared/storage"
-import type { TimeRangeKey } from "../shared/types"
+import type {
+  LeaderboardState,
+  PopupPreferences,
+  TimeRangeKey
+} from "../shared/types"
 
 export interface PopupRuntime {
   document: Document
-  loadState: typeof loadState
-  savePopupPreferences: typeof savePopupPreferences
+  loadState: () => Promise<LeaderboardState>
+  savePopupPreferences: (preferences: PopupPreferences) => Promise<void>
   subscribeToLeaderboardStateChanges: (listener: () => void) => () => void
 }
 
