@@ -30,6 +30,8 @@ import {
   resolvePreservedSelection,
   resolveScopeLabel
 } from "./helpers"
+import { Effect } from "effect"
+import { LeaderboardStorage } from "./services/storage-service"
 
 export type LeaderboardState = typeof leaderboardStateSchema.Type
 
@@ -375,10 +377,24 @@ function PopupApp(input: {
   )
 }
 
+function runPopupEffect<A>(
+  effect: Effect.Effect<A, never, LeaderboardStorage>
+): Promise<A> {
+  return Effect.runPromise(
+    effect.pipe(Effect.provide(LeaderboardStorage.layer))
+  )
+}
+
 function createBrowserRuntime(): PopupRuntime {
   return {
     document,
-    loadState,
+    loadState: () =>
+      runPopupEffect(
+        Effect.gen(function* () {
+          const storage = yield* LeaderboardStorage
+          return yield* storage.loadState()
+        })
+      ),
     savePopupPreferences,
     addStorageChangeListener: (listener) => {
       chrome.storage.onChanged.addListener(listener)
