@@ -444,7 +444,7 @@ async function loadPopupModule(window: {
     window
   })
 
-  return await import("../popup")
+  return await import("..")
 }
 
 function createPopupDom() {

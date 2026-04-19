@@ -12,8 +12,8 @@ import type {
   TimeRangeKey,
   TreemapSummary
 } from "../shared/types"
-import type { LeaderboardState } from "./popup"
-import { ALL_CHANNELS_VALUE } from "./popup"
+import type { LeaderboardState } from "."
+import { ALL_CHANNELS_VALUE } from "."
 import type {
   PopupSelection,
   RefreshRequest,

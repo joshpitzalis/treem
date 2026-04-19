@@ -23,6 +23,7 @@
     "cheq": "node scripts/run-pnpm.mjs lint && node scripts/run-pnpm.mjs types && node scripts/run-pnpm.mjs tests"
   },
   "dependencies": {
+    "@effect/atom-react": "4.0.0-beta.50",
     "effect": "4.0.0-beta.50",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

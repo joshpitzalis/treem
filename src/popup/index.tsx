@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { createRoot, type Root } from "react-dom/client"
-import "./popup.css"
+import "./lib/styles.css"
 import {
   filterMessagesByView,
   listChannels,
@@ -18,9 +18,8 @@ import {
   leaderboardStateSchema
 } from "../shared/types"
 import type { PopupRuntime, PopupSelection, RefreshRequest } from "./types"
-
+import { AtomRegistryProvider } from "./lib/atom-registry-provider";
 import { ReadinessChip, LeaderboardSection, TreemapSection } from "./components"
-
 import {
   createEmptyReadinessStates,
   ensurePopupMountNode,
@@ -62,12 +61,14 @@ export async function bootstrapPopup(
 
   flushSync(() => {
     popupRoot?.render(
+      <AtomRegistryProvider>
       <PopupApp
         key={renderKey}
         runtime={popupRuntime}
         initialState={initialState}
         initialSelection={initialSelection}
-      />
+        />
+      </AtomRegistryProvider>
     )
   })
 }
