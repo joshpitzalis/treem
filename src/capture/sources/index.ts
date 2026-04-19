@@ -1,4 +1,4 @@
-import type { CaptureSource, CaptureSourceLocation } from "../types"
+import type { CaptureSource, CaptureSourceLocation } from "../lib/types"
 import { circleCaptureSource } from "./circle"
 import { discordCaptureSource } from "./discord"
 

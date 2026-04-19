@@ -1,7 +1,7 @@
 import { flushSync } from "react-dom"
 import { createRoot, type Root } from "react-dom/client"
 import type { LeaderboardState } from "../../../../shared/types"
-import type { CaptureCategorizationRuntime } from "../../../types"
+import type { CaptureCategorizationRuntime } from "../../../lib/types"
 import { looksLikeReplyMessageNode } from "../helpers/message-parser"
 import categoryControlStyles from "../lib/styles.css?inline"
 import {

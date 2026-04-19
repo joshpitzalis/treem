@@ -3,7 +3,7 @@ import type {
   ContributionMessage,
   LeaderboardState,
   ViewerProfile
-} from "../shared/types"
+} from "../../shared/types"
 
 export interface CaptureCategorizationRuntime {
   document: Document

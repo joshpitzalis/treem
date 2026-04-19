@@ -1,6 +1,6 @@
 {
   "name": "discord-contribution-leaderboard",
-  "version": "0.1.19",
+  "version": "0.1.20",
   "private": true,
   "description": "Chrome extension that captures visible Discord activity and builds a local leaderboard.",
   "packageManager": "pnpm@10.2.0",

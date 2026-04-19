@@ -1,4 +1,4 @@
-import type { CaptureSource } from "../../types"
+import type { CaptureSource } from "../../lib/types"
 import { enhanceCategorizationControls } from "./components/categorization"
 import {
   detectCurrentCommunity,

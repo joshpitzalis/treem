@@ -1,0 +1,2 @@
+export const DEFAULT_DEBOUNCE_MS = 750
+export const DEFAULT_POLL_INTERVAL_MS = 10_000
